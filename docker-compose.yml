@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: foodapp-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: fooddb
+      MYSQL_USER: fooduser
+      MYSQL_PASSWORD: foodpass
+    ports:
+      - "3307:3306" # 3307 là port trên máy thật
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - foodapp-net
+
+  backend:
+    build: ./backend
+    container_name: foodapp-backend
+    restart: always
+    depends_on:
+      - mysql
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/fooddb
+      SPRING_DATASOURCE_USERNAME: fooduser
+      SPRING_DATASOURCE_PASSWORD: foodpass
+      SPRING_MAIL_USERNAME: doquan19062004@gmail.com
+      SPRING_MAIL_PASSWORD: kaul gpax jahb lfuj
+    ports:
+      - "8090:8090"
+    networks:
+      - foodapp-net
+
+  frontend:
+    build: ./frontend
+    container_name: foodapp-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    networks:
+      - foodapp-net
+
+networks:
+  foodapp-net:
+    driver: bridge
+
+volumes:
+  mysql_data:
