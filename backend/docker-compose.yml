@@ -19,7 +19,7 @@ services:
 
   foodapp_test:
     build: .
-    container_name: foodapp_test
+    container_name: foodappTest
     environment:
       # ✅ Profile test
       SPRING_PROFILES_ACTIVE: test

@@ -1,7 +1,7 @@
 import uuid
 import requests
 
-BASE_URL = "http://foodapp_test:8091/api/auth/register"
+BASE_URL = "http://foodappTest:8091/api/auth/register"
 
 
 def random_email():
