@@ -21,7 +21,6 @@ public class UserController {
 
     private final UserService userService;
 
-
     @GetMapping("/all")
     @PreAuthorize("hasAuthority('ADMIN')") // ADMIN ALONE HAVE ACCESS TO THIS endpoint
     public ResponseEntity<Response<List<UserDTO>>> getAllUsers(){
@@ -47,6 +46,4 @@ public class UserController {
     public ResponseEntity<Response<UserDTO>> getOwnAccountDetails() {
         return ResponseEntity.ok(userService.getOwnAccountDetails());
     }
-
-
 }

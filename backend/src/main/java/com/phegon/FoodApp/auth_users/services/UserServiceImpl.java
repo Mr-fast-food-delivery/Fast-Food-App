@@ -39,13 +39,17 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User getCurrentLoggedInUser() {
-
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
-        return userRepository.findByEmail(email)
-                .orElseThrow(()-> new NotFoundException("user not found"));
+        if (!user.isActive()) {
+            throw new NotFoundException("Account not active");
+        }
 
+        return user;
     }
+
 
     @Override
     public Response<List<UserDTO>> getAllUsers() {
@@ -176,18 +180,3 @@ public class UserServiceImpl implements UserService {
 
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
