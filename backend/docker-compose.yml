@@ -73,7 +73,7 @@ services:
           fi;
           sleep 2;
         done &&
-        pytest -v --maxfail=1 --disable-warnings
+        pytest -v --maxfail=0 --disable-warnings
       "
 
 networks:
