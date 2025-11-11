@@ -1,0 +1,81 @@
+version: "3.9"
+
+services:
+  mysql_test:
+    image: mysql:8
+    container_name: mysql_test
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: fooddb_test
+    ports:
+      - "3307:3306"
+    networks:
+      - backend_net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  foodapp_test:
+    build: .
+    container_name: foodapp_test
+    environment:
+      # ✅ Profile test
+      SPRING_PROFILES_ACTIVE: test
+
+      # ✅ MySQL connection
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql_test:3306/fooddb_test
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: 123456
+
+      # ✅ JWT key (đảm bảo app khởi chạy không lỗi)
+      JWT_SECRET: super-secret-for-tests
+    depends_on:
+      mysql_test:
+        condition: service_healthy
+    ports:
+      - "8091:8091"
+    networks:
+      - backend_net
+
+    # ✅ Healthcheck để pytest chờ đến khi app thật sự sẵn sàng
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8091/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    command: >
+      sh -c "echo '⏳ Waiting for MySQL...' &&
+      sleep 10 &&
+      java -jar app.jar --spring.profiles.active=test"
+
+  pytest_runner:
+    image: python:3.11
+    container_name: pytest_runner
+    working_dir: /test
+    volumes:
+      - ./src/test:/test
+    depends_on:
+      foodapp_test:
+        condition: service_healthy
+    networks:
+      - backend_net
+    command: >
+      sh -c "
+        apt-get update -qq &&
+        apt-get install -y curl &&
+        pip install -q pytest requests &&
+        echo '⏳ Waiting for API to start...' &&
+        for i in {1..30}; do
+          if curl -s http://foodapp_test:8091/actuator/health | grep 'UP' >/dev/null; then
+            echo '✅ API is up, starting tests!' && break;
+          fi;
+          sleep 2;
+        done &&
+        pytest -v --maxfail=1 --disable-warnings
+      "
+
+networks:
+  backend_net:
+    driver: bridge
