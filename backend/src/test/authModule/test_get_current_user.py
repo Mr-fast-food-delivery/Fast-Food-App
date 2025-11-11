@@ -1,3 +1,4 @@
+import time
 import requests
 import uuid
 import mysql.connector
@@ -76,3 +77,45 @@ def test_get_current_user_inactive_user():
     body_text = res.text.lower()
     assert "inactive" in body_text or "not active" in body_text, f"Unexpected message: {res.text}"
 
+def test_get_current_user_expired_token():
+    """
+    Giả lập token hết hạn bằng cách giảm thời gian EXPIRATION_TIME trong backend (ví dụ còn 5s)
+    hoặc chờ quá thời hạn rồi gọi lại API.
+    """
+    email, password, token = register_and_login()
+
+    print("⏳ Đang chờ token hết hạn (giả lập 10 giây)...")
+    time.sleep(10)  # phải khớp với EXPIRATION_TIME trong JwtUtils nếu bạn set ngắn
+
+    headers = {"Authorization": f"Bearer {token}"}
+    res = requests.get(ACCOUNT_URL, headers=headers)
+    assert res.status_code in (401, 403)
+    assert "expired" in res.text.lower() or "invalid" in res.text.lower(), f"Unexpected: {res.text}"
+
+
+def test_get_current_user_deleted_user():
+    email, password, token = register_and_login()
+
+    conn = mysql.connector.connect(
+        host="mysql_test", user="root", password="123456", database="fooddb_test"
+    )
+    cur = conn.cursor()
+
+    # 🔹 Xóa trước trong bảng users_roles
+    cur.execute("""
+        DELETE ur FROM users_roles ur
+        JOIN users u ON ur.user_id = u.id
+        WHERE u.email = %s
+    """, (email,))
+
+    # 🔹 Sau đó mới xóa user
+    cur.execute("DELETE FROM users WHERE email = %s", (email,))
+    conn.commit()
+    conn.close()
+
+    headers = {"Authorization": f"Bearer {token}"}
+    res = requests.get(ACCOUNT_URL, headers=headers)
+
+    assert res.status_code in (401, 404)
+    body_text = res.text.lower()
+    assert any(word in body_text for word in ["not found", "deleted", "invalid"]), f"Unexpected: {res.text}"
