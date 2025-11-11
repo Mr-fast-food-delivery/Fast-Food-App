@@ -62,20 +62,34 @@ services:
     networks:
       - backend_net
     command: >
-      sh -c "
-        apt-get update -qq &&
-        apt-get install -y curl &&
-        pip install -q pytest requests &&
-        echo '⏳ Waiting for API to start...' &&
-        for i in {1..30}; do
-          if curl -s http://foodapp_test:8091/actuator/health | grep 'UP' >/dev/null; then
-            echo '✅ API is up, starting tests!' && break;
-          fi;
-          sleep 2;
-        done &&
-        pytest -v --maxfail=0 --disable-warnings
-      "
+      bash -c '
+      mkdir -p logs &&
+      chmod -R 777 logs &&
+      apt-get update -qq &&
+      apt-get install -y curl > /dev/null &&
+      pip install -q pytest requests mysql-connector-python &&
+      echo "⏳ Waiting for API to start..." &&
+      for i in {1..30}; do
+        if curl -s http://foodapp_test:8091/actuator/health | grep "UP" >/dev/null; then
+          echo "✅ API is up, starting tests!" && break;
+        fi;
+        sleep 2;
+      done &&
+      cd /test &&
+      echo "" > logs/grouped_test.log &&
+      echo "🚀 Auto-running tests per module folder..." &&
+      for d in $$(find . -maxdepth 1 -type d ! -path "." ); do
+        if ls $$d/test_*.py >/dev/null 2>&1; then
+          echo -e "\n=============================================" | tee -a logs/grouped_test.log;
+          echo "📁 Running tests in: $${d#./}" | tee -a logs/grouped_test.log;
+          echo "=============================================" | tee -a logs/grouped_test.log;
+          pytest -vv --disable-warnings --capture=no "$$d" 2>&1 | tee -a logs/grouped_test.log;
+          echo "" | tee -a logs/grouped_test.log;
+        fi;
+      done
+      '
 
+# pytest -v --maxfail=0 --disable-warnings
 networks:
   backend_net:
     driver: bridge
