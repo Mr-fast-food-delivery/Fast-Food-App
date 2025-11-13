@@ -117,14 +117,24 @@ public class AuthServiceImpl implements AuthService{
     }
 
     private void validateRegistrationRequest(RegistrationRequest req) {
-        if (!req.getEmail().matches("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"))
+
+        if (req.getName() == null || req.getName().trim().isEmpty())
+            throw new BadRequestException("Name is required");
+
+        if (req.getEmail() == null)
+            throw new BadRequestException("Email is required");
+        if (!req.getEmail().matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$"))
             throw new BadRequestException("Invalid email format");
+
+        if (req.getPassword() == null)
+            throw new BadRequestException("Password is required");
         if (req.getPassword().length() < 6)
             throw new BadRequestException("Password must be at least 6 characters long");
-        if (!req.getPhoneNumber().matches("\\d+"))
-            throw new BadRequestException("Invalid phone number format");
-        if (req.getPhoneNumber().length() < 10)
-            throw new BadRequestException("Phone number must not exceed 10 digits");
+
+        if (req.getPhoneNumber() == null)
+            throw new BadRequestException("Phone number is required");
+        if (!req.getPhoneNumber().matches("^[0-9]{10}$"))
+            throw new BadRequestException("Phone number must be 10 digits");
     }
 
     private void validateLoginRequest(LoginRequest req) {
