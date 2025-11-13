@@ -31,7 +31,7 @@ public class Order {
 
     @ManyToOne
     @JoinColumn(name = "user_id")
-    private User user; // Customer
+    private User user; // CUSTOMER
 
     private LocalDateTime orderDate;
 

@@ -41,9 +41,8 @@ public class FoodAppApplication {
     CommandLineRunner initRoles(RoleRepository roleRepository) {
         return args -> {
             if (roleRepository.count() == 0) {
-                roleRepository.save(new Role(null, "customer"));
-                roleRepository.save(new Role(null, "admin"));
-                roleRepository.save(new Role(null, "staff"));
+                roleRepository.save(new Role(null, "CUSTOMER"));
+                roleRepository.save(new Role(null, "ADMIN"));
                 System.out.println("✅ Default roles inserted into database.");
             }
         };
