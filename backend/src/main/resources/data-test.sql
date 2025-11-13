@@ -1,2 +1,0 @@
-INSERT INTO roles (id, name) VALUES (1,'CUSTOMER') ON DUPLICATE KEY UPDATE name=VALUES(name);
-INSERT INTO roles (id, name) VALUES (2,'ADMIN')    ON DUPLICATE KEY UPDATE name=VALUES(name);
