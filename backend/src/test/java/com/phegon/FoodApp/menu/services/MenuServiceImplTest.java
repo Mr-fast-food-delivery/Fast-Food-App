@@ -847,6 +847,32 @@ class MenuServiceImplTest {
             verify(cb, times(2)).like(any(), contains("pizza"));
         }
     }
+    jakarta.persistence.criteria.Root<Menu> mockRoot() {
+        @SuppressWarnings("unchecked")
+        jakarta.persistence.criteria.Root<Menu> root = mock(jakarta.persistence.criteria.Root.class);
+
+        jakarta.persistence.criteria.Path<Object> path = mock(jakarta.persistence.criteria.Path.class);
+
+        // dùng lenient vì không phải test nào cũng sử dụng tất cả stubbing này
+        lenient().when(root.get(anyString())).thenReturn(path);
+        lenient().when(path.get(anyString())).thenReturn(path);
+
+        return root;
+    }
+    jakarta.persistence.criteria.CriteriaBuilder mockCb() {
+
+        jakarta.persistence.criteria.CriteriaBuilder cb = mock(jakarta.persistence.criteria.CriteriaBuilder.class);
+        jakarta.persistence.criteria.Predicate p = mock(jakarta.persistence.criteria.Predicate.class);
+        jakarta.persistence.criteria.Expression<String> expr = mock(jakarta.persistence.criteria.Expression.class);
+
+        lenient().when(cb.and(any(jakarta.persistence.criteria.Predicate[].class))).thenReturn(p);
+        lenient().when(cb.or(any(), any())).thenReturn(p);
+        lenient().when(cb.equal(any(), any())).thenReturn(p);
+        lenient().when(cb.lower(any())).thenReturn(expr);
+        lenient().when(cb.like(any(), anyString())).thenReturn(p);
+
+        return cb;
+    }
 
 }
 
