@@ -47,10 +47,6 @@ class AuthServiceImplTest {
         log.info(YELLOW + "---- Starting AuthService Test ----" + RESET);
     }
 
-    // ====================================================================
-    // REGISTER TESTS
-    // ====================================================================
-
     @Test
     void testRegisterSuccess() {
         log.info("Running testRegisterSuccess");
@@ -111,10 +107,6 @@ class AuthServiceImplTest {
 
         log.info(GREEN + "✔ testRegisterRoleNotFound passed" + RESET);
     }
-
-    // ====================================================================
-    // LOGIN TESTS
-    // ====================================================================
 
     @Test
     void testLoginSuccess() {
