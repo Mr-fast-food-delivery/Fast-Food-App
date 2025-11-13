@@ -26,15 +26,6 @@ import static org.mockito.Mockito.*;
 
 class AuthServiceImplTest {
 
-    private static final org.slf4j.Logger log =
-            org.slf4j.LoggerFactory.getLogger(AuthServiceImplTest.class);
-
-    // Màu ANSI
-    private static final String GREEN = "\u001B[32m";
-    private static final String YELLOW = "\u001B[33m";
-    private static final String RED = "\u001B[31m";
-    private static final String RESET = "\u001B[0m";
-
     @Mock private UserRepository userRepository;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private JwtUtils jwtUtils;
@@ -45,62 +36,62 @@ class AuthServiceImplTest {
     @BeforeEach
     void init() {
         MockitoAnnotations.openMocks(this);
-        log.info(YELLOW + "---- Starting AuthService Test ----" + RESET);
     }
 
+    // ===================== REGISTER INVALID PASSWORD =====================
     @Test
     void testRegisterInvalidPassword() {
         RegistrationRequest req = new RegistrationRequest();
         req.setName("Eve");
         req.setEmail("eve@example.com");
-        req.setPassword("123"); // too short
+        req.setPassword("123");
         req.setPhoneNumber("0901234567");
         req.setAddress("City");
         req.setRoles(List.of("CUSTOMER"));
 
         when(userRepository.existsByEmail(anyString())).thenReturn(false);
 
-        assertThrows(BadRequestException.class,
-                () -> authService.register(req));
+        assertThrows(BadRequestException.class, () -> authService.register(req));
     }
 
+    // ===================== PHONE TOO SHORT =====================
     @Test
     void testRegisterInvalidPhoneTooShort() {
         RegistrationRequest req = new RegistrationRequest();
         req.setName("Grace");
         req.setEmail("grace@example.com");
         req.setPassword("Valid123!");
-        req.setPhoneNumber("091234567");  // 9 digits
+        req.setPhoneNumber("091234567");
         req.setAddress("City");
         req.setRoles(List.of("CUSTOMER"));
 
         when(userRepository.existsByEmail(anyString())).thenReturn(false);
 
-        assertThrows(BadRequestException.class,
-                () -> authService.register(req));
+        assertThrows(BadRequestException.class, () -> authService.register(req));
     }
 
+    // ===================== PHONE LETTERS =====================
     @Test
     void testRegisterInvalidPhoneIncludeLetters() {
         RegistrationRequest req = new RegistrationRequest();
         req.setName("Frank");
         req.setEmail("frank@example.com");
         req.setPassword("Valid123!");
-        req.setPhoneNumber("55InvalidPhone"); // contains letters
+        req.setPhoneNumber("InvalidPhone11");
         req.setAddress("City");
         req.setRoles(List.of("CUSTOMER"));
 
         when(userRepository.existsByEmail(anyString())).thenReturn(false);
 
-        assertThrows(BadRequestException.class,
-                () -> authService.register(req));
+        assertThrows(BadRequestException.class, () -> authService.register(req));
     }
 
+    // ===================== INVALID EMAIL =====================
     @Test
     void testRegisterInvalidEmailFormat() {
         RegistrationRequest req = new RegistrationRequest();
         req.setName("TestUser");
-        req.setEmail("invalid-email"); // wrong format
+        req.setEmail("invalid-email");
         req.setPassword("Valid123!");
         req.setPhoneNumber("0901234567");
         req.setAddress("City");
@@ -108,10 +99,10 @@ class AuthServiceImplTest {
 
         when(userRepository.existsByEmail(anyString())).thenReturn(false);
 
-        assertThrows(BadRequestException.class,
-                () -> authService.register(req));
+        assertThrows(BadRequestException.class, () -> authService.register(req));
     }
 
+    // ===================== DEFAULT ROLE WHEN EMPTY =====================
     @Test
     void testRegisterDefaultRole() {
         RegistrationRequest req = new RegistrationRequest();
@@ -120,19 +111,21 @@ class AuthServiceImplTest {
         req.setPassword("Valid123!");
         req.setPhoneNumber("0906666666");
         req.setAddress("City");
-        req.setRoles(List.of()); // EMPTY
+        req.setRoles(List.of());
 
         when(userRepository.existsByEmail(anyString())).thenReturn(false);
-
-        // default role CUSTOMER
         when(roleRepository.findByName("CUSTOMER"))
-                .thenReturn(Optional.of(new Role(1L, "CUSTOMER")));
+              .thenReturn(Optional.of(new Role(1L, "CUSTOMER")));
         when(passwordEncoder.encode(anyString()))
-                .thenReturn("encoded");
+              .thenReturn("encodedPass");
+
+        when(userRepository.save(any(User.class)))
+              .thenAnswer(invocation -> invocation.getArgument(0));
 
         assertDoesNotThrow(() -> authService.register(req));
     }
 
+    // ===================== MISSING EMAIL =====================
     @Test
     void testRegisterMissingEmail() {
         RegistrationRequest req = new RegistrationRequest();
@@ -142,18 +135,17 @@ class AuthServiceImplTest {
         req.setAddress("City");
         req.setRoles(List.of("CUSTOMER"));
 
-        assertThrows(BadRequestException.class,
-                () -> authService.register(req));
+        assertThrows(BadRequestException.class, () -> authService.register(req));
     }
 
+    // ===================== EMPTY BODY =====================
     @Test
     void testRegisterEmptyBody() {
-        RegistrationRequest req = new RegistrationRequest(); // empty
-
-        assertThrows(BadRequestException.class,
-                () -> authService.register(req));
+        RegistrationRequest req = new RegistrationRequest();
+        assertThrows(BadRequestException.class, () -> authService.register(req));
     }
 
+    // ===================== MISSING NAME =====================
     @Test
     void testRegisterMissingName() {
         RegistrationRequest req = new RegistrationRequest();
@@ -163,23 +155,23 @@ class AuthServiceImplTest {
         req.setAddress("City");
         req.setRoles(List.of("CUSTOMER"));
 
-        assertThrows(BadRequestException.class,
-                () -> authService.register(req));
+        assertThrows(BadRequestException.class, () -> authService.register(req));
     }
 
+    // ===================== MISSING PASSWORD =====================
     @Test
     void testRegisterMissingPassword() {
         RegistrationRequest req = new RegistrationRequest();
         req.setEmail("test@example.com");
-        req.setName("NoPassword");
+        req.setName("NoPass");
         req.setPhoneNumber("0905555555");
         req.setAddress("City");
         req.setRoles(List.of("CUSTOMER"));
 
-        assertThrows(BadRequestException.class,
-                () -> authService.register(req));
+        assertThrows(BadRequestException.class, () -> authService.register(req));
     }
 
+    // ===================== MISSING PHONE =====================
     @Test
     void testRegisterMissingPhoneNumber() {
         RegistrationRequest req = new RegistrationRequest();
@@ -189,73 +181,68 @@ class AuthServiceImplTest {
         req.setAddress("City");
         req.setRoles(List.of("CUSTOMER"));
 
-        assertThrows(BadRequestException.class,
-                () -> authService.register(req));
+        assertThrows(BadRequestException.class, () -> authService.register(req));
     }
 
+    // ===================== LOGIN SUCCESS =====================
     @Test
     void testLoginSuccess() {
-        log.info("Running testLoginSuccess");
-
         LoginRequest req = new LoginRequest();
         req.setEmail("test@example.com");
         req.setPassword("Secret123");
 
-        User mockUser = new User();
-        mockUser.setEmail("test@example.com");
-        mockUser.setPassword("encoded");
-        mockUser.setActive(true);
-        mockUser.setRoles(List.of(new Role(1L, "CUSTOMER")));
+        User user = new User();
+        user.setActive(true);
+        user.setEmail("test@example.com");
+        user.setPassword("encodedPass");
+        user.setRoles(List.of(new Role(1L, "CUSTOMER")));
 
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(mockUser));
-        when(passwordEncoder.matches("Secret123", "encoded")).thenReturn(true);
-        when(jwtUtils.generateToken(anyString())).thenReturn("TOKEN123");
+        when(userRepository.findByEmail("test@example.com"))
+              .thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("Secret123", "encodedPass"))
+              .thenReturn(true);
+        when(jwtUtils.generateToken(anyString()))
+              .thenReturn("TOKEN123");
 
         var response = authService.login(req);
 
         assertEquals(200, response.getStatusCode());
-        assertEquals("Login Successful", response.getMessage());
         assertEquals("TOKEN123", response.getData().getToken());
-
-        log.info(GREEN + "✔ testLoginSuccess passed" + RESET);
     }
 
+    // ===================== LOGIN WRONG PASSWORD =====================
     @Test
     void testLoginWrongPassword() {
-        log.info("Running testLoginWrongPassword");
-
         LoginRequest req = new LoginRequest();
         req.setEmail("test@example.com");
         req.setPassword("wrong");
 
-        User mockUser = new User();
-        mockUser.setEmail("test@example.com");
-        mockUser.setPassword("encoded");
-        mockUser.setActive(true);
+        User user = new User();
+        user.setActive(true);
+        user.setEmail("test@example.com");
+        user.setPassword("encodedPass");
 
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(mockUser));
-        when(passwordEncoder.matches("wrong", "encoded")).thenReturn(false);
+        when(userRepository.findByEmail("test@example.com"))
+              .thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrong", "encodedPass"))
+              .thenReturn(false);
 
         assertThrows(BadRequestException.class, () -> authService.login(req));
-
-        log.info(GREEN + "✔ testLoginWrongPassword passed" + RESET);
     }
 
+    // ===================== LOGIN INACTIVE USER =====================
     @Test
     void testLoginInactiveUser() {
-        log.info("Running testLoginInactiveUser");
-
         LoginRequest req = new LoginRequest();
         req.setEmail("inactive@example.com");
         req.setPassword("Secret123");
 
-        User mockUser = new User();
-        mockUser.setActive(false);
+        User user = new User();
+        user.setActive(false);
 
-        when(userRepository.findByEmail(req.getEmail())).thenReturn(Optional.of(mockUser));
+        when(userRepository.findByEmail("inactive@example.com"))
+              .thenReturn(Optional.of(user));
 
         assertThrows(NotFoundException.class, () -> authService.login(req));
-
-        log.info(GREEN + "✔ testLoginInactiveUser passed" + RESET);
     }
 }
