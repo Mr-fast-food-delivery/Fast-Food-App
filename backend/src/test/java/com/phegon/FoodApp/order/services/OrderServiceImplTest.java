@@ -37,6 +37,7 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -958,44 +959,41 @@ class OrderServiceImplTest {
     class OrderEmailTests {
 
         @Test
+        void testOrderEmail_TemplateError() throws Exception {
+            User user = mockUserWithAddress();
+            OrderDTO dto = mockFullOrderDTO();
+
+            when(templateEngine.process(eq("order-confirmation"), any()))
+                    .thenThrow(new RuntimeException("template error"));
+
+            Method m = OrderServiceImpl.class
+                    .getDeclaredMethod("sendOrderConfirmationEmail", User.class, OrderDTO.class);
+            m.setAccessible(true);
+
+            InvocationTargetException ex = assertThrows(InvocationTargetException.class,
+                    () -> m.invoke(orderService, user, dto));
+
+            assertTrue(ex.getCause() instanceof RuntimeException);
+            assertEquals("template error", ex.getCause().getMessage());
+        }
+
+        @Test
         void testOrderEmail_Success() throws Exception {
             User user = mockUserWithAddress();
             OrderDTO dto = mockFullOrderDTO();
 
-            when(modelMapper.map(any(Order.class), eq(OrderDTO.class)))
-                    .thenReturn(dto);
-
+            // template return hợp lệ
             when(templateEngine.process(eq("order-confirmation"), any()))
                     .thenReturn("<html>Email OK</html>");
 
             doNothing().when(notificationService).sendEmail(any());
 
-            // invoke private method
             Method m = OrderServiceImpl.class
                     .getDeclaredMethod("sendOrderConfirmationEmail", User.class, OrderDTO.class);
+
             m.setAccessible(true);
 
             assertDoesNotThrow(() -> m.invoke(orderService, user, dto));
         }
-
-        @Test
-        void testOrderEmail_TemplateError() throws Exception {
-            User user = mockUserWithAddress();
-            OrderDTO dto = mockFullOrderDTO();
-
-            when(modelMapper.map(any(Order.class), eq(OrderDTO.class)))
-                    .thenReturn(dto);
-
-            // Only stub templateEngine (template itself fails)
-            when(templateEngine.process(eq("order-confirmation"), any()))
-                    .thenThrow(new RuntimeException("template failed"));
-
-            Method m = OrderServiceImpl.class
-                    .getDeclaredMethod("sendOrderConfirmationEmail", User.class, OrderDTO.class);
-            m.setAccessible(true);
-
-            assertThrows(RuntimeException.class, () -> m.invoke(orderService, user, dto));
-        }
-
     }
 }
