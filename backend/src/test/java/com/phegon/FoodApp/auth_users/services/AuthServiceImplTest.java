@@ -21,6 +21,7 @@ import java.util.Optional;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -72,12 +73,12 @@ class AuthServiceImplTest {
 
     // ===================== PHONE LETTERS =====================
     @Test
-    void testRegisterInvalidPhoneIncludeLetters() {
+    void testRegisterInvalidPhoneNotNumeric() {
         RegistrationRequest req = new RegistrationRequest();
         req.setName("Frank");
         req.setEmail("frank@example.com");
         req.setPassword("Valid123!");
-        req.setPhoneNumber("InvalidPhone11");
+        req.setPhoneNumber("#123456789");
         req.setAddress("City");
         req.setRoles(List.of("CUSTOMER"));
 
