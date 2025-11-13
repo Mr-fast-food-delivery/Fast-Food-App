@@ -228,6 +228,22 @@ class UserServiceImplTest {
                 () -> userService.updateOwnAccount(dto));
     }
 
+        @Test
+    void testUpdateOwnAccount_UploadFileNull() {
+        User u = mockUser();
+        UserDTO dto = new UserDTO();  // imageFile = null → mặc định
+
+        when(userRepository.findByEmail("test@example.com"))
+                .thenReturn(Optional.of(u));
+
+        Response<?> res = userService.updateOwnAccount(dto);
+
+        assertEquals(200, res.getStatusCode());
+        verify(awss3Service, never()).uploadFile(anyString(), any());
+        verify(awss3Service, never()).deleteFile(anyString());
+        verify(userRepository).save(u);
+    }
+
     @Test
     void testUpdateOwnAccount_UpdateProfileImage() throws Exception {
         User u = mockUser();
@@ -362,6 +378,4 @@ class UserServiceImplTest {
         verify(userRepository, never()).save(any());
         verify(notificationService, never()).sendEmail(any());
     }
-
-
 }

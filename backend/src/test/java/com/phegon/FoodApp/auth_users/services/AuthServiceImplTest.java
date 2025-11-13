@@ -39,7 +39,7 @@ class AuthServiceImplTest {
         MockitoAnnotations.openMocks(this);
     }
 
-    // ===================== REGISTER INVALID PASSWORD =====================
+    // ===================== REGISTER  =====================
     @Test
     void testRegisterInvalidPassword() {
         RegistrationRequest req = new RegistrationRequest();
@@ -55,7 +55,6 @@ class AuthServiceImplTest {
         assertThrows(BadRequestException.class, () -> authService.register(req));
     }
 
-    // ===================== PHONE TOO SHORT =====================
     @Test
     void testRegisterInvalidPhoneTooShort() {
         RegistrationRequest req = new RegistrationRequest();
@@ -71,7 +70,6 @@ class AuthServiceImplTest {
         assertThrows(BadRequestException.class, () -> authService.register(req));
     }
 
-    // ===================== PHONE LETTERS =====================
     @Test
     void testRegisterInvalidPhoneNotNumeric() {
         RegistrationRequest req = new RegistrationRequest();
@@ -87,7 +85,6 @@ class AuthServiceImplTest {
         assertThrows(BadRequestException.class, () -> authService.register(req));
     }
 
-    // ===================== INVALID EMAIL =====================
     @Test
     void testRegisterInvalidEmailFormat() {
         RegistrationRequest req = new RegistrationRequest();
@@ -103,7 +100,6 @@ class AuthServiceImplTest {
         assertThrows(BadRequestException.class, () -> authService.register(req));
     }
 
-    // ===================== DEFAULT ROLE WHEN EMPTY =====================
     @Test
     void testRegisterDefaultRole() {
         RegistrationRequest req = new RegistrationRequest();
@@ -126,7 +122,6 @@ class AuthServiceImplTest {
         assertDoesNotThrow(() -> authService.register(req));
     }
 
-    // ===================== MISSING EMAIL =====================
     @Test
     void testRegisterMissingEmail() {
         RegistrationRequest req = new RegistrationRequest();
@@ -139,14 +134,65 @@ class AuthServiceImplTest {
         assertThrows(BadRequestException.class, () -> authService.register(req));
     }
 
-    // ===================== EMPTY BODY =====================
     @Test
     void testRegisterEmptyBody() {
         RegistrationRequest req = new RegistrationRequest();
         assertThrows(BadRequestException.class, () -> authService.register(req));
     }
 
-    // ===================== MISSING NAME =====================
+    @Test
+    void testRegister_EmailHasWhitespace() {
+        RegistrationRequest req = new RegistrationRequest();
+        req.setName("User");
+        req.setEmail("test @gmail.com"); // <= invalid
+        req.setPassword("Password123!");
+        req.setPhoneNumber("0901234567");
+        req.setAddress("City");
+        req.setRoles(List.of("CUSTOMER"));
+
+        assertThrows(BadRequestException.class,
+                () -> authService.register(req));
+    }
+
+    @Test
+    void testRegister_MultipleRoles_Success() {
+        RegistrationRequest req = new RegistrationRequest();
+        req.setName("MultiRole");
+        req.setEmail("multi@example.com");
+        req.setPassword("Password123!");
+        req.setPhoneNumber("0902222333");
+        req.setAddress("City");
+        req.setRoles(List.of("ADMIN", "CUSTOMER"));
+
+        when(userRepository.existsByEmail("multi@example.com")).thenReturn(false);
+        when(roleRepository.findByName("ADMIN")).thenReturn(Optional.of(new Role("ADMIN")));
+        when(roleRepository.findByName("CUSTOMER")).thenReturn(Optional.of(new Role("CUSTOMER")));
+
+        Response<?> res = authService.register(req);
+
+        assertEquals(200, res.getStatusCode());
+    }
+
+    @Test
+    void testRegister_MultipleRoles_OneInvalid() {
+        RegistrationRequest req = new RegistrationRequest();
+        req.setName("MultiRole");
+        req.setEmail("multi2@example.com");
+        req.setPassword("Password123!");
+        req.setPhoneNumber("0902222333");
+        req.setAddress("City");
+        req.setRoles(List.of("ADMIN", "INVALID_ROLE"));
+
+        when(userRepository.existsByEmail("multi2@example.com")).thenReturn(false);
+
+        when(roleRepository.findByName("ADMIN")).thenReturn(Optional.of(new Role("ADMIN")));
+        when(roleRepository.findByName("INVALID_ROLE")).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class,
+                () -> authService.register(req));
+    }
+
+    // ===================== LOGIN =====================
     @Test
     void testRegisterMissingName() {
         RegistrationRequest req = new RegistrationRequest();
@@ -159,7 +205,6 @@ class AuthServiceImplTest {
         assertThrows(BadRequestException.class, () -> authService.register(req));
     }
 
-    // ===================== MISSING PASSWORD =====================
     @Test
     void testRegisterMissingPassword() {
         RegistrationRequest req = new RegistrationRequest();
@@ -172,7 +217,6 @@ class AuthServiceImplTest {
         assertThrows(BadRequestException.class, () -> authService.register(req));
     }
 
-    // ===================== MISSING PHONE =====================
     @Test
     void testRegisterMissingPhoneNumber() {
         RegistrationRequest req = new RegistrationRequest();
@@ -185,7 +229,6 @@ class AuthServiceImplTest {
         assertThrows(BadRequestException.class, () -> authService.register(req));
     }
 
-    // ===================== LOGIN SUCCESS =====================
     @Test
     void testLoginSuccess() {
         LoginRequest req = new LoginRequest();
@@ -211,7 +254,6 @@ class AuthServiceImplTest {
         assertEquals("TOKEN123", response.getData().getToken());
     }
 
-    // ===================== LOGIN WRONG PASSWORD =====================
     @Test
     void testLoginWrongPassword() {
         LoginRequest req = new LoginRequest();
@@ -231,7 +273,6 @@ class AuthServiceImplTest {
         assertThrows(BadRequestException.class, () -> authService.login(req));
     }
 
-    // ===================== LOGIN INACTIVE USER =====================
     @Test
     void testLoginInactiveUser() {
         LoginRequest req = new LoginRequest();
@@ -247,7 +288,6 @@ class AuthServiceImplTest {
         assertThrows(NotFoundException.class, () -> authService.login(req));
     }
 
-    // ===================== LOGIN MISS EMAIL =====================
     @Test
     void testLoginMissingEmail() {
         LoginRequest req = new LoginRequest();
@@ -256,7 +296,6 @@ class AuthServiceImplTest {
         assertThrows(BadRequestException.class, () -> authService.login(req));
     }
 
-    // ===================== LOGIN MISS PASSWORD =====================
     @Test
     void testLoginMissingPassword() {
         LoginRequest req = new LoginRequest();
@@ -266,11 +305,36 @@ class AuthServiceImplTest {
         assertThrows(BadRequestException.class, () -> authService.login(req));
     }
 
-    // ===================== LOGIN MISS PASSWORD =====================
     @Test
     void testLoginEmpty() {
         LoginRequest req = new LoginRequest();
 
         assertThrows(BadRequestException.class, () -> authService.login(req));
     }
+
+    @Test
+    void testLoginEmailNotFound() {
+        LoginRequest req = new LoginRequest();
+        req.setPassword("Secret123");
+
+        req.setEmail("notfound@example.com");
+        when(userRepository.findByEmail("notfound@example.com"))
+                .thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class,
+                () -> authService.login(req));
+    }
+
+    @Test
+    void testLoginInvalidEmailFormat() {
+        // Arrange
+        LoginRequest req = new LoginRequest();
+        req.setEmail("invalid-email");
+        req.setPassword("Secret123");
+
+        // Assert
+        assertThrows(BadRequestException.class,
+                () -> authService.login(req));
+    }
+
 }
