@@ -34,7 +34,7 @@ class CartServiceImplTest {
     @Mock private UserService userService;
     @Mock private ModelMapper modelMapper;
 
-    @InjectMocks private CartService cartService;
+    @InjectMocks private CartServiceImpl cartService;
 
     private User mockUser() {
         User u = new User();
