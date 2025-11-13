@@ -90,47 +90,32 @@ public class UserServiceImpl implements UserService {
 
         log.info("INSIDE updateOwnAccount()");
 
-        // Fetch the currently logged-in user
         User user = getCurrentLoggedInUser();
+
+        validateUpdate(userDTO);
 
         String profileUrl = user.getProfileUrl();
         MultipartFile imageFile = userDTO.getImageFile();
 
-
-        log.info("EXISTIN Profile URL IS: " + profileUrl);
-
-        // Check if a new imageFile was provided
+        // Handle profile image
         if (imageFile != null && !imageFile.isEmpty()) {
-            // Delete the old image from S3 if it exists
+
             if (profileUrl != null && !profileUrl.isEmpty()) {
                 String keyName = profileUrl.substring(profileUrl.lastIndexOf("/") + 1);
                 awss3Service.deleteFile("profile/" + keyName);
-
-                log.info("Deleted old profile image from s3");
             }
-            //upload new image
-            String imageName = UUID.randomUUID().toString() + "_" + imageFile.getOriginalFilename();
-            URL newImageUrl = awss3Service.uploadFile("profile/" + imageName, imageFile);
 
+            String imageName = UUID.randomUUID() + "_" + imageFile.getOriginalFilename();
+            URL newImageUrl = awss3Service.uploadFile("profile/" + imageName, imageFile);
             user.setProfileUrl(newImageUrl.toString());
         }
 
-
-        // Update user details
-        if (userDTO.getName() != null) {
-            user.setName(userDTO.getName());
-        }
-
-        if (userDTO.getPhoneNumber() != null) {
-            user.setPhoneNumber(userDTO.getPhoneNumber());
-        }
-
-        if (userDTO.getAddress() != null) {
-            user.setAddress(userDTO.getAddress());
-        }
+        // Update fields
+        if (userDTO.getName() != null) user.setName(userDTO.getName());
+        if (userDTO.getPhoneNumber() != null) user.setPhoneNumber(userDTO.getPhoneNumber());
+        if (userDTO.getAddress() != null) user.setAddress(userDTO.getAddress());
 
         if (userDTO.getEmail() != null && !userDTO.getEmail().equals(user.getEmail())) {
-            // Check if the new email is already taken
             if (userRepository.existsByEmail(userDTO.getEmail())) {
                 throw new BadRequestException("Email already exists");
             }
@@ -141,15 +126,14 @@ public class UserServiceImpl implements UserService {
             user.setPassword(passwordEncoder.encode(userDTO.getPassword()));
         }
 
-        // Save the updated user
         userRepository.save(user);
 
         return Response.builder()
                 .statusCode(HttpStatus.OK.value())
                 .message("Account updated successfully")
                 .build();
-
     }
+
 
     @Override
     public Response<?> deactivateOwnAccount() {
@@ -179,4 +163,38 @@ public class UserServiceImpl implements UserService {
                 .build();
 
     }
+
+    private void validateUpdate(UserDTO dto) {
+
+    // NAME
+    if (dto.getName() != null && dto.getName().trim().isEmpty()) {
+        throw new BadRequestException("Name cannot be empty");
+    }
+
+    // EMAIL FORMAT
+    if (dto.getEmail() != null &&
+        !dto.getEmail().matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
+        throw new BadRequestException("Invalid email format");
+    }
+
+    // PHONE NUMBER
+    if (dto.getPhoneNumber() != null) {
+        String phone = dto.getPhoneNumber();
+
+        if (!phone.matches("^[0-9]{10}$")) {
+            throw new BadRequestException("Phone number must be exactly 10 digits");
+        }
+    }
+
+    // PASSWORD LENGTH
+    if (dto.getPassword() != null && dto.getPassword().length() < 6) {
+        throw new BadRequestException("Password must be at least 6 characters");
+    }
+
+    // IMAGE
+    if (dto.getImageFile() != null && dto.getImageFile().isEmpty()) {
+        throw new BadRequestException("Image file cannot be empty");
+    }
+}
+
 }
