@@ -264,4 +264,12 @@ class AuthServiceImplTest {
 
         assertThrows(BadRequestException.class, () -> authService.login(req));
     }
+
+    // ===================== LOGIN MISS PASSWORD =====================
+    @Test
+    void testLoginEmpty() {
+        LoginRequest req = new LoginRequest();
+
+        assertThrows(BadRequestException.class, () -> authService.login(req));
+    }
 }
