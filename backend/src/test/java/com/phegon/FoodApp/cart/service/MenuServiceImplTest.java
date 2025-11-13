@@ -59,6 +59,7 @@ class CartServiceImplTest {
         item.setId(id);
         item.setMenu(menu);
         item.setQuantity(qty);
+        item.setPricePerUnit(new BigDecimal("10000"));
         item.setSubtotal(subtotal);
         return item;
     }
@@ -79,23 +80,33 @@ class CartServiceImplTest {
     // ====================addItemToCart==================
     @Test
     void testAddItem_NewCartCreated() {
+
         User user = mockUser();
-        Menu menu = mockMenu(1L, BigDecimal.valueOf(50));
+        when(userService.getCurrentLoggedInUser()).thenReturn(user);
+
+        Menu menu = mockMenu(1L, BigDecimal.valueOf(10));
+        when(menuRepository.findById(1L)).thenReturn(Optional.of(menu));
+
+        when(cartRepository.findByUser_Id(user.getId())).thenReturn(Optional.empty());
+
+        Cart cart = new Cart();
+        cart.setId(1L);
+        cart.setUser(user);
+        cart.setCartItems(new ArrayList<>());
+        when(cartRepository.save(any(Cart.class))).thenReturn(cart);
 
         CartDTO dto = new CartDTO();
         dto.setMenuId(1L);
         dto.setQuantity(2);
 
-        when(userService.getCurrentLoggedInUser()).thenReturn(user);
-        when(menuRepository.findById(1L)).thenReturn(Optional.of(menu));
-        when(cartRepository.findByUser_Id(1L)).thenReturn(Optional.empty());
+        Response<?> response = cartService.addItemToCart(dto);
 
-        Response<?> res = cartService.addItemToCart(dto);
-
-        assertEquals(200, res.getStatusCode());
-        verify(cartRepository).save(any());
-        verify(cartItemRepository).save(any());
+        assertEquals(200, response.getStatusCode());
+        verify(cartRepository).save(any(Cart.class));
+        verify(cartItemRepository).save(any(CartItem.class));
     }
+
+
 
     @Test
     void testAddItem_AddToExistingCart() {
@@ -411,27 +422,39 @@ class CartServiceImplTest {
 
     @Test
     void testGetShoppingCart_RemoveReviewsInResponse() {
+
         User user = mockUser();
+        when(userService.getCurrentLoggedInUser()).thenReturn(user);
 
-        Menu menu = mockMenu(1L, new BigDecimal("10.00"));
-        menu.setReviews(List.of()); // original reviews
+        Menu menu = mockMenu(1L, BigDecimal.valueOf(10));
+        menu.setReviews(Collections.emptyList());  // reviews trong DB
 
-        CartItem item = mockCartItem(1L, menu, 1, new BigDecimal("10.00"));
-        Cart cart = mockCart(user, List.of(item));
+        CartItem item = new CartItem();
+        item.setId(1L);
+        item.setMenu(menu);
+        item.setQuantity(1);
+        item.setPricePerUnit(BigDecimal.TEN);
+        item.setSubtotal(BigDecimal.TEN);
+
+        Cart cart = new Cart();
+        cart.setId(1L);
+        cart.setUser(user);
+        cart.setCartItems(List.of(item));
+
+        when(cartRepository.findByUser_Id(user.getId())).thenReturn(Optional.of(cart));
 
         CartDTO dto = new CartDTO();
-        dto.setTotalAmount(new BigDecimal("10.00"));
-        dto.setCartItems(new ArrayList<>()); // empty dtos
+        dto.setCartItems(new ArrayList<>());
+        dto.setTotalAmount(BigDecimal.TEN);
 
-        when(userService.getCurrentLoggedInUser()).thenReturn(user);
-        when(cartRepository.findByUser_Id(user.getId())).thenReturn(Optional.of(cart));
         when(modelMapper.map(cart, CartDTO.class)).thenReturn(dto);
 
         Response<CartDTO> res = cartService.getShoppingCart();
 
         assertEquals(200, res.getStatusCode());
-        assertNull(res.getData().getCartItems()); // reviews removed
+        assertNull(res.getData().getCartItems().get(0).getMenu().getReviews());
     }
+
 
     //============clearShoppingCart=============
     @Test
@@ -470,18 +493,22 @@ class CartServiceImplTest {
 
     @Test
     void testClearShoppingCart_EmptyCart_NoError() {
-        User user = mockUser();
-        Cart cart = mockCart(user, new ArrayList<>()); // cart rỗng
 
+        User user = mockUser();
         when(userService.getCurrentLoggedInUser()).thenReturn(user);
+
+        Cart cart = new Cart();
+        cart.setId(1L);
+        cart.setUser(user);
+        cart.setCartItems(new ArrayList<>()); // EMPTY cart
+
         when(cartRepository.findByUser_Id(user.getId())).thenReturn(Optional.of(cart));
 
-        Response<?> res = cartService.clearShoppingCart();
+        Response<?> response = cartService.clearShoppingCart();
 
+        assertEquals(200, response.getStatusCode());
         verify(cartItemRepository, never()).deleteAll(anyList());
         verify(cartRepository).save(cart);
-
-        assertEquals(200, res.getStatusCode());
     }
 
 }
