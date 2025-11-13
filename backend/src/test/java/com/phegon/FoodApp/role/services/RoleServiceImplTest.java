@@ -14,6 +14,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.*;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -102,20 +104,26 @@ class RoleServiceImplTest {
 
         @Test
         void createRole_FieldMappingCorrect() {
-            RoleDTO dto = mockDto();
-            Role role = new Role();
 
-            ArgumentCaptor<Role> captor = ArgumentCaptor.forClass(Role.class);
+            RoleDTO dto = new RoleDTO();
+            dto.setName("ADMIN");
 
-            when(modelMapper.map(dto, Role.class)).thenReturn(role);
-            when(roleRepository.save(any())).thenReturn(role);
-            when(modelMapper.map(any(), eq(RoleDTO.class))).thenReturn(dto);
+            when(modelMapper.map(any(), eq(Role.class)))
+                    .thenAnswer(inv -> {
+                        RoleDTO input = inv.getArgument(0);  // KHÔNG trùng dto
+                        Role r = new Role();
+                        r.setName(input.getName());
+                        return r;
+                    });
 
-            roleService.createRole(dto);
+            when(roleRepository.save(any(Role.class)))
+                    .thenAnswer(inv -> inv.getArgument(0));
 
-            verify(roleRepository).save(captor.capture());
-            assertEquals("ADMIN", captor.getValue().getName());
+            Response<RoleDTO> res = roleService.createRole(dto);
+
+            assertEquals("ADMIN", res.getData().getName());
         }
+
     }
 
     // =====================================================
