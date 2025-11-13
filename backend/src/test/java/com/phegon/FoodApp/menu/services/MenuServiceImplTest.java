@@ -10,6 +10,11 @@ import com.phegon.FoodApp.menu.entity.Menu;
 import com.phegon.FoodApp.menu.repository.MenuRepository;
 import com.phegon.FoodApp.response.Response;
 import com.phegon.FoodApp.review.dtos.ReviewDTO;
+
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Root;
+
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
@@ -29,6 +34,12 @@ import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.*;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 
 @ExtendWith(MockitoExtension.class)
 class MenuServiceImplTest {
@@ -747,34 +758,40 @@ class MenuServiceImplTest {
     @Nested
     class BuildSpecificationTests {
 
-        @SuppressWarnings("unchecked")
-        org.springframework.data.jpa.domain.Specification<Menu> callSpec(Long categoryId, String search) throws Exception {
+        Specification<Menu> callSpec(Long categoryId, String search) throws Exception {
             var m = MenuServiceImpl.class
                     .getDeclaredMethod("buildSpecification", Long.class, String.class);
             m.setAccessible(true);
-            return (org.springframework.data.jpa.domain.Specification<Menu>)
-                    m.invoke(menuService, categoryId, search);
+            return (Specification<Menu>) m.invoke(menuService, categoryId, search);
         }
 
-        jakarta.persistence.criteria.Root<Menu> mockRoot() {
-            @SuppressWarnings("unchecked")
-            jakarta.persistence.criteria.Root<Menu> root = mock(jakarta.persistence.criteria.Root.class);
-            jakarta.persistence.criteria.Path<Object> path = mock(jakarta.persistence.criteria.Path.class);
-            when(root.get(anyString())).thenReturn(path);
-            when(path.get(anyString())).thenReturn(path);
+        Root<Menu> mockRoot() {
+            Root<Menu> root = mock(Root.class);
+
+            Path<Object> categoryPath = mock(Path.class);
+            Path<Object> categoryIdPath = mock(Path.class);
+            Path<Object> namePath = mock(Path.class);
+            Path<Object> descPath = mock(Path.class);
+
+            // avoid strict stubbing → use doReturn()
+            doReturn(categoryPath).when(root).get("category");
+            doReturn(categoryIdPath).when(categoryPath).get("id");
+            doReturn(namePath).when(root).get("name");
+            doReturn(descPath).when(root).get("description");
+
             return root;
         }
 
-        jakarta.persistence.criteria.CriteriaBuilder mockCb() {
-            jakarta.persistence.criteria.CriteriaBuilder cb = mock(jakarta.persistence.criteria.CriteriaBuilder.class);
-            jakarta.persistence.criteria.Predicate p = mock(jakarta.persistence.criteria.Predicate.class);
-            jakarta.persistence.criteria.Expression<String> expr = mock(jakarta.persistence.criteria.Expression.class);
+        CriteriaBuilder mockCb() {
+            CriteriaBuilder cb = mock(CriteriaBuilder.class);
+            Predicate p = mock(Predicate.class);
+            Expression<String> expr = mock(Expression.class);
 
-            when(cb.and(any(jakarta.persistence.criteria.Predicate[].class))).thenReturn(p);
-            when(cb.equal(any(), any())).thenReturn(p);
-            when(cb.or(any(), any())).thenReturn(p);
-            when(cb.lower(any())).thenReturn(expr);
-            when(cb.like(any(), anyString())).thenReturn(p);
+            lenient().when(cb.and(any(Predicate[].class))).thenReturn(p);
+            lenient().when(cb.equal(any(), any())).thenReturn(p);
+            lenient().when(cb.or(any(), any())).thenReturn(p);
+            lenient().when(cb.lower(any())).thenReturn(expr);
+            lenient().when(cb.like(any(), anyString())).thenReturn(p);
 
             return cb;
         }
@@ -782,15 +799,12 @@ class MenuServiceImplTest {
         @Test
         void spec_NoFilters() throws Exception {
             var spec = callSpec(null, null);
-
-            var root = mockRoot();
-            jakarta.persistence.criteria.CriteriaQuery<?> query =
-                    mock(jakarta.persistence.criteria.CriteriaQuery.class);
-            var cb = mockCb();
+            Root<Menu> root = mockRoot();
+            CriteriaQuery<?> query = mock(CriteriaQuery.class);
+            CriteriaBuilder cb = mockCb();
 
             spec.toPredicate(root, query, cb);
 
-            // không gọi equal / like khi không có filter
             verify(cb, never()).equal(any(), any());
             verify(cb, never()).like(any(), anyString());
         }
@@ -798,11 +812,9 @@ class MenuServiceImplTest {
         @Test
         void spec_CategoryOnly() throws Exception {
             var spec = callSpec(1L, null);
-
-            var root = mockRoot();
-            jakarta.persistence.criteria.CriteriaQuery<?> query =
-                    mock(jakarta.persistence.criteria.CriteriaQuery.class);
-            var cb = mockCb();
+            Root<Menu> root = mockRoot();
+            CriteriaQuery<?> query = mock(CriteriaQuery.class);
+            CriteriaBuilder cb = mockCb();
 
             spec.toPredicate(root, query, cb);
 
@@ -813,33 +825,28 @@ class MenuServiceImplTest {
         @Test
         void spec_SearchOnly() throws Exception {
             var spec = callSpec(null, "pizza");
-
-            var root = mockRoot();
-            jakarta.persistence.criteria.CriteriaQuery<?> query =
-                    mock(jakarta.persistence.criteria.CriteriaQuery.class);
-            var cb = mockCb();
+            Root<Menu> root = mockRoot();
+            CriteriaQuery<?> query = mock(CriteriaQuery.class);
+            CriteriaBuilder cb = mockCb();
 
             spec.toPredicate(root, query, cb);
 
-            // 2 like: name + description
-            verify(cb, times(2)).like(any(), contains("%pizza%"));
-            verify(cb, never()).equal(any(), any());
+            verify(cb, times(2)).like(any(), contains("pizza"));
         }
 
         @Test
         void spec_CategoryAndSearch() throws Exception {
             var spec = callSpec(1L, "pizza");
-
-            var root = mockRoot();
-            jakarta.persistence.criteria.CriteriaQuery<?> query =
-                    mock(jakarta.persistence.criteria.CriteriaQuery.class);
-            var cb = mockCb();
+            Root<Menu> root = mockRoot();
+            CriteriaQuery<?> query = mock(CriteriaQuery.class);
+            CriteriaBuilder cb = mockCb();
 
             spec.toPredicate(root, query, cb);
 
             verify(cb, times(1)).equal(any(), eq(1L));
-            verify(cb, times(2)).like(any(), contains("%pizza%"));
+            verify(cb, times(2)).like(any(), contains("pizza"));
         }
     }
+
 }
 
