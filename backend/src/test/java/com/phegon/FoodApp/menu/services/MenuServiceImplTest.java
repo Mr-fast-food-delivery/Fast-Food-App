@@ -50,6 +50,43 @@ class MenuServiceImplTest {
     @Mock org.modelmapper.ModelMapper modelMapper;
 
     @InjectMocks MenuServiceImpl menuService;
+    jakarta.persistence.criteria.Root<Menu> mockRoot() {
+        @SuppressWarnings("unchecked")
+        jakarta.persistence.criteria.Root<Menu> root = mock(jakarta.persistence.criteria.Root.class);
+
+        // chỉ mock đúng những gì buildSpecification thực sự gọi
+        jakarta.persistence.criteria.Path<Object> cat = mock(jakarta.persistence.criteria.Path.class);
+        jakarta.persistence.criteria.Path<Object> catId = mock(jakarta.persistence.criteria.Path.class);
+
+        // root.get("category") → path
+        when(root.get("category")).thenReturn(cat);
+        // path.get("id") → catId
+        when(cat.get("id")).thenReturn(catId);
+
+        // cho search: root.get("name"), root.get("description")
+        jakarta.persistence.criteria.Path<Object> name = mock(jakarta.persistence.criteria.Path.class);
+        jakarta.persistence.criteria.Path<Object> description = mock(jakarta.persistence.criteria.Path.class);
+
+        when(root.get("name")).thenReturn(name);
+        when(root.get("description")).thenReturn(description);
+
+        return root;
+    }
+
+    jakarta.persistence.criteria.CriteriaBuilder mockCb() {
+        jakarta.persistence.criteria.CriteriaBuilder cb = mock(jakarta.persistence.criteria.CriteriaBuilder.class);
+
+        jakarta.persistence.criteria.Predicate p = mock(jakarta.persistence.criteria.Predicate.class);
+        jakarta.persistence.criteria.Expression<String> expr = mock(jakarta.persistence.criteria.Expression.class);
+
+        when(cb.equal(any(), any())).thenReturn(p);
+        when(cb.or(any(), any())).thenReturn(p);
+        when(cb.and(any(jakarta.persistence.criteria.Predicate[].class))).thenReturn(p);
+        when(cb.lower(any())).thenReturn(expr);
+        when(cb.like(any(), anyString())).thenReturn(p);
+
+        return cb;
+    }
 
     // helper
     MenuDTO mockMenuDTO() {
@@ -846,32 +883,6 @@ class MenuServiceImplTest {
             verify(cb, times(1)).equal(any(), eq(1L));
             verify(cb, times(2)).like(any(), contains("pizza"));
         }
-    }
-    jakarta.persistence.criteria.Root<Menu> mockRoot() {
-        @SuppressWarnings("unchecked")
-        jakarta.persistence.criteria.Root<Menu> root = mock(jakarta.persistence.criteria.Root.class);
-
-        jakarta.persistence.criteria.Path<Object> path = mock(jakarta.persistence.criteria.Path.class);
-
-        // dùng lenient vì không phải test nào cũng sử dụng tất cả stubbing này
-        lenient().when(root.get(anyString())).thenReturn(path);
-        lenient().when(path.get(anyString())).thenReturn(path);
-
-        return root;
-    }
-    jakarta.persistence.criteria.CriteriaBuilder mockCb() {
-
-        jakarta.persistence.criteria.CriteriaBuilder cb = mock(jakarta.persistence.criteria.CriteriaBuilder.class);
-        jakarta.persistence.criteria.Predicate p = mock(jakarta.persistence.criteria.Predicate.class);
-        jakarta.persistence.criteria.Expression<String> expr = mock(jakarta.persistence.criteria.Expression.class);
-
-        lenient().when(cb.and(any(jakarta.persistence.criteria.Predicate[].class))).thenReturn(p);
-        lenient().when(cb.or(any(), any())).thenReturn(p);
-        lenient().when(cb.equal(any(), any())).thenReturn(p);
-        lenient().when(cb.lower(any())).thenReturn(expr);
-        lenient().when(cb.like(any(), anyString())).thenReturn(p);
-
-        return cb;
     }
 
 }
