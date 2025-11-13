@@ -99,6 +99,42 @@ class PaymentServiceImplTest {
     // A. INITIALIZE PAYMENT — 11 TEST
 
     @Test
+    void testInitializePayment_MissingMetadata() {
+        PaymentDTO req = new PaymentDTO();
+        req.setOrderId(1L);
+        req.setAmount(BigDecimal.valueOf(100));
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+
+        try (MockedStatic<PaymentIntent> mocked = mockStatic(PaymentIntent.class)) {
+
+            mocked.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class)))
+                    .thenThrow(new IllegalArgumentException("Missing metadata"));
+
+            assertThrows(RuntimeException.class,
+                    () -> paymentService.initializePayment(req));
+        }
+    }
+
+    @Test
+    void testInitializePayment_StripeThrows() {
+        PaymentDTO req = new PaymentDTO();
+        req.setOrderId(1L);
+        req.setAmount(BigDecimal.valueOf(100));
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+
+        try (MockedStatic<PaymentIntent> mocked = mockStatic(PaymentIntent.class)) {
+
+            mocked.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class)))
+                    .thenThrow(new RuntimeException("Stripe error"));
+
+            assertThrows(RuntimeException.class,
+                    () -> paymentService.initializePayment(req));
+        }
+    }
+
+    @Test
     void testInitializePayment_Success() {
         PaymentDTO req = new PaymentDTO();
         req.setOrderId(1L);
@@ -106,18 +142,21 @@ class PaymentServiceImplTest {
 
         when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
 
-        MockedStatic<PaymentIntent> mocked = mockStatic(PaymentIntent.class);
-        PaymentIntent intent = mock(PaymentIntent.class);
-        when(intent.getClientSecret()).thenReturn("secret123");
+        try (MockedStatic<PaymentIntent> mocked = mockStatic(PaymentIntent.class)) {
 
-        mocked.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class))).thenReturn(intent);
+            PaymentIntent intent = mock(PaymentIntent.class);
+            when(intent.getClientSecret()).thenReturn("secret123");
 
-        Response<?> res = paymentService.initializePayment(req);
-        assertEquals(200, res.getStatusCode());
-        assertEquals("secret123", res.getData());
+            mocked.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class)))
+                    .thenReturn(intent);
 
-        mocked.close();
+            Response<?> res = paymentService.initializePayment(req);
+
+            assertEquals(200, res.getStatusCode());
+            assertEquals("secret123", res.getData());
+        }
     }
+
 
     @Test
     void testInitializePayment_OrderNotFound() {
@@ -177,41 +216,7 @@ class PaymentServiceImplTest {
         assertThrows(BadRequestException.class, () -> paymentService.initializePayment(req));
     }
 
-    @Test
-    void testInitializePayment_StripeThrows() {
-        PaymentDTO req = new PaymentDTO();
-        req.setOrderId(1L);
-        req.setAmount(BigDecimal.valueOf(100));
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
-
-        MockedStatic<PaymentIntent> mocked = mockStatic(PaymentIntent.class);
-
-        mocked.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class)))
-                .thenThrow(new RuntimeException("Stripe error"));
-
-        assertThrows(RuntimeException.class, () -> paymentService.initializePayment(req));
-
-        mocked.close();
-    }
-
-    @Test
-    void testInitializePayment_MissingMetadata() {
-        PaymentDTO req = new PaymentDTO();
-        req.setOrderId(1L);
-        req.setAmount(BigDecimal.valueOf(100));
-
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
-
-        MockedStatic<PaymentIntent> mocked = mockStatic(PaymentIntent.class);
-
-        mocked.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class)))
-                .thenThrow(new IllegalArgumentException("Missing metadata"));
-
-        assertThrows(RuntimeException.class, () -> paymentService.initializePayment(req));
-
-        mocked.close();
-    }
 
     @Test
     void testInitializePayment_StripeKeyNull() throws Exception {
