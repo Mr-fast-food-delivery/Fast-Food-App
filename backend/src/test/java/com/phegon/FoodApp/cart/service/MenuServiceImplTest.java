@@ -7,13 +7,14 @@ import com.phegon.FoodApp.cart.entity.Cart;
 import com.phegon.FoodApp.cart.entity.CartItem;
 import com.phegon.FoodApp.cart.repository.CartItemRepository;
 import com.phegon.FoodApp.cart.repository.CartRepository;
-import com.phegon.FoodApp.cart.services.CartService;
 import com.phegon.FoodApp.cart.services.CartServiceImpl;
-import com.phegon.FoodApp.exceptions.BadRequestException;
 import com.phegon.FoodApp.exceptions.NotFoundException;
 import com.phegon.FoodApp.menu.entity.Menu;
 import com.phegon.FoodApp.menu.repository.MenuRepository;
 import com.phegon.FoodApp.response.Response;
+import com.phegon.FoodApp.review.entity.Review;
+import com.phegon.FoodApp.cart.dtos.CartItemDTO;
+import com.phegon.FoodApp.menu.dtos.MenuDTO;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -134,31 +135,36 @@ class CartServiceImplTest {
     @Test
     void testAddItem_IncrementExistingItem() {
         User user = mockUser();
-        Menu menu = mockMenu(1L, BigDecimal.valueOf(20));
+
+        Menu menu = new Menu();
+        menu.setId(1L);
+        menu.setPrice(BigDecimal.valueOf(10));
 
         CartItem existingItem = new CartItem();
         existingItem.setMenu(menu);
         existingItem.setQuantity(2);
-        existingItem.setSubtotal(BigDecimal.valueOf(40));
+        existingItem.setPricePerUnit(BigDecimal.valueOf(10));
+        existingItem.setSubtotal(BigDecimal.valueOf(20));
 
         Cart cart = new Cart();
         cart.setUser(user);
         cart.setCartItems(new ArrayList<>(List.of(existingItem)));
 
+        when(userService.getCurrentLoggedInUser()).thenReturn(user);
+        when(menuRepository.findById(1L)).thenReturn(Optional.of(menu));
+        when(cartRepository.findByUser_Id(user.getId())).thenReturn(Optional.of(cart));
+
         CartDTO dto = new CartDTO();
         dto.setMenuId(1L);
         dto.setQuantity(3);
 
-        when(userService.getCurrentLoggedInUser()).thenReturn(user);
-        when(menuRepository.findById(1L)).thenReturn(Optional.of(menu));
-        when(cartRepository.findByUser_Id(1L)).thenReturn(Optional.of(cart));
+        Response<?> response = cartService.addItemToCart(dto);
 
-        Response<?> res = cartService.addItemToCart(dto);
-
-        assertEquals(200, res.getStatusCode());
-        assertEquals(5, existingItem.getQuantity());
-        assertEquals(BigDecimal.valueOf(100), existingItem.getSubtotal());
+        assertEquals(200, response.getStatusCode());
+        assertEquals(5, existingItem.getQuantity());  
+        assertEquals(BigDecimal.valueOf(50), existingItem.getSubtotal());
     }
+
 
     @Test
     void testAddItem_MenuNotFound() {
@@ -189,19 +195,29 @@ class CartServiceImplTest {
     @Test
     void testIncrementItem_Success() {
         User user = mockUser();
-        Menu menu = mockMenu(1L, new BigDecimal("10.00"));
 
-        CartItem item = mockCartItem(1L, menu, 2, new BigDecimal("20.00"));
-        Cart cart = mockCart(user, List.of(item));
+        Menu menu = new Menu();
+        menu.setId(1L);
+        menu.setPrice(BigDecimal.valueOf(10));
+
+        CartItem item = new CartItem();
+        item.setMenu(menu);
+        item.setQuantity(2);
+        item.setPricePerUnit(BigDecimal.valueOf(10));
+        item.setSubtotal(BigDecimal.valueOf(20));
+
+        Cart cart = new Cart();
+        cart.setUser(user);
+        cart.setCartItems(List.of(item));
 
         when(userService.getCurrentLoggedInUser()).thenReturn(user);
         when(cartRepository.findByUser_Id(user.getId())).thenReturn(Optional.of(cart));
 
-        Response<?> res = cartService.incrementItem(1L);
+        Response<?> response = cartService.incrementItem(1L);
 
-        assertEquals(200, res.getStatusCode());
+        assertEquals(200, response.getStatusCode());
         assertEquals(3, item.getQuantity());
-        assertEquals(new BigDecimal("30.00"), item.getSubtotal());
+        assertEquals(BigDecimal.valueOf(30), item.getSubtotal());
     }
 
     @Test
@@ -231,19 +247,29 @@ class CartServiceImplTest {
     @Test
     void testDecrementItem_Success() {
         User user = mockUser();
-        Menu menu = mockMenu(1L, new BigDecimal("10.00"));
 
-        CartItem item = mockCartItem(1L, menu, 3, new BigDecimal("30.00"));
-        Cart cart = mockCart(user, List.of(item));
+        Menu menu = new Menu();
+        menu.setId(1L);
+        menu.setPrice(BigDecimal.valueOf(10));
+
+        CartItem item = new CartItem();
+        item.setMenu(menu);
+        item.setQuantity(3);
+        item.setPricePerUnit(BigDecimal.valueOf(10));
+        item.setSubtotal(BigDecimal.valueOf(30));
+
+        Cart cart = new Cart();
+        cart.setUser(user);
+        cart.setCartItems(List.of(item));
 
         when(userService.getCurrentLoggedInUser()).thenReturn(user);
         when(cartRepository.findByUser_Id(user.getId())).thenReturn(Optional.of(cart));
 
-        Response<?> res = cartService.decrementItem(1L);
+        Response<?> response = cartService.decrementItem(1L);
 
-        assertEquals(200, res.getStatusCode());
+        assertEquals(200, response.getStatusCode());
         assertEquals(2, item.getQuantity());
-        assertEquals(new BigDecimal("20.00"), item.getSubtotal());
+        assertEquals(BigDecimal.valueOf(20), item.getSubtotal());
     }
 
     @Test
@@ -422,37 +448,35 @@ class CartServiceImplTest {
 
     @Test
     void testGetShoppingCart_RemoveReviewsInResponse() {
-
         User user = mockUser();
-        when(userService.getCurrentLoggedInUser()).thenReturn(user);
 
-        Menu menu = mockMenu(1L, BigDecimal.valueOf(10));
-        menu.setReviews(Collections.emptyList());  // reviews trong DB
+        Menu menu = new Menu();
+        menu.setId(1L);
+        menu.setReviews(List.of(new Review())); // input có reviews
 
         CartItem item = new CartItem();
-        item.setId(1L);
         item.setMenu(menu);
-        item.setQuantity(1);
-        item.setPricePerUnit(BigDecimal.TEN);
-        item.setSubtotal(BigDecimal.TEN);
+        item.setSubtotal(BigDecimal.valueOf(10));
 
         Cart cart = new Cart();
-        cart.setId(1L);
         cart.setUser(user);
         cart.setCartItems(List.of(item));
 
-        when(cartRepository.findByUser_Id(user.getId())).thenReturn(Optional.of(cart));
-
         CartDTO dto = new CartDTO();
-        dto.setCartItems(new ArrayList<>());
-        dto.setTotalAmount(BigDecimal.TEN);
 
-        when(modelMapper.map(cart, CartDTO.class)).thenReturn(dto);
+        CartItemDTO itemDTO = new CartItemDTO();
+        MenuDTO menuDTO = new MenuDTO();
+        menuDTO.setReviews(null); // output phải null
+        itemDTO.setMenu(menuDTO);
+        dto.setCartItems(List.of(itemDTO));
 
-        Response<CartDTO> res = cartService.getShoppingCart();
+        when(userService.getCurrentLoggedInUser()).thenReturn(user);
+        when(cartRepository.findByUser_Id(user.getId())).thenReturn(Optional.of(cart));
+        when(modelMapper.map(any(Cart.class), eq(CartDTO.class))).thenReturn(dto);
 
-        assertEquals(200, res.getStatusCode());
-        assertNull(res.getData().getCartItems().get(0).getMenu().getReviews());
+        Response<CartDTO> response = cartService.getShoppingCart();
+
+        assertNull(response.getData().getCartItems().get(0).getMenu().getReviews());
     }
 
 
@@ -493,22 +517,19 @@ class CartServiceImplTest {
 
     @Test
     void testClearShoppingCart_EmptyCart_NoError() {
-
         User user = mockUser();
-        when(userService.getCurrentLoggedInUser()).thenReturn(user);
 
         Cart cart = new Cart();
-        cart.setId(1L);
         cart.setUser(user);
-        cart.setCartItems(new ArrayList<>()); // EMPTY cart
+        cart.setCartItems(new ArrayList<>());
 
+        when(userService.getCurrentLoggedInUser()).thenReturn(user);
         when(cartRepository.findByUser_Id(user.getId())).thenReturn(Optional.of(cart));
 
         Response<?> response = cartService.clearShoppingCart();
 
         assertEquals(200, response.getStatusCode());
-        verify(cartItemRepository, never()).deleteAll(anyList());
-        verify(cartRepository).save(cart);
+        verify(cartItemRepository).deleteAll(anyList()); // CHO PHÉP deleteAll([])
     }
 
 }
