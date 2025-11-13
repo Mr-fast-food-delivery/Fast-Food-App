@@ -104,24 +104,30 @@ class RoleServiceImplTest {
 
         @Test
         void createRole_FieldMappingCorrect() {
-
             RoleDTO dto = new RoleDTO();
             dto.setName("ADMIN");
 
-            when(modelMapper.map(any(), eq(Role.class)))
-                    .thenAnswer(inv -> {
-                        RoleDTO input = inv.getArgument(0);  // KHÔNG trùng dto
-                        Role r = new Role();
-                        r.setName(input.getName());
-                        return r;
-                    });
+            Role mapped = new Role();
+            mapped.setName("ADMIN");
 
-            when(roleRepository.save(any(Role.class)))
-                    .thenAnswer(inv -> inv.getArgument(0));
+            // map DTO -> Entity
+            when(modelMapper.map(any(RoleDTO.class), eq(Role.class)))
+                    .thenReturn(mapped);
 
-            Response<RoleDTO> res = roleService.createRole(dto);
+            // simulate DB saved entity
+            Role saved = new Role();
+            saved.setId(1L);
+            saved.setName("ADMIN");
 
-            assertEquals("ADMIN", res.getData().getName());
+            when(roleRepository.save(any(Role.class))).thenReturn(saved);
+
+            // map Entity -> DTO
+            when(modelMapper.map(any(Role.class), eq(RoleDTO.class)))
+                    .thenReturn(dto);
+
+            Response<RoleDTO> response = roleService.createRole(dto);
+
+            assertEquals("ADMIN", response.getData().getName());
         }
 
     }
