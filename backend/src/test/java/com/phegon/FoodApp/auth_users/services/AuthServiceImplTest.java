@@ -9,6 +9,7 @@ import com.phegon.FoodApp.exceptions.NotFoundException;
 import com.phegon.FoodApp.role.entity.Role;
 import com.phegon.FoodApp.role.repository.RoleRepository;
 import com.phegon.FoodApp.security.JwtUtils;
+import com.phegon.FoodApp.response.Response;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
-
 class AuthServiceImplTest {
 
     @Mock private UserRepository userRepository;
@@ -164,9 +164,21 @@ class AuthServiceImplTest {
         req.setAddress("City");
         req.setRoles(List.of("ADMIN", "CUSTOMER"));
 
-        when(userRepository.existsByEmail("multi@example.com")).thenReturn(false);
-        when(roleRepository.findByName("ADMIN")).thenReturn(Optional.of(new Role("ADMIN")));
-        when(roleRepository.findByName("CUSTOMER")).thenReturn(Optional.of(new Role("CUSTOMER")));
+        when(userRepository.existsByEmail("multi@example.com"))
+                .thenReturn(false);
+
+        // FIXED: Role(Long, String)
+        Role adminRole = new Role(1L, "ADMIN");
+        Role customerRole = new Role(2L, "CUSTOMER");
+
+        when(roleRepository.findByName("ADMIN"))
+                .thenReturn(Optional.of(adminRole));
+
+        when(roleRepository.findByName("CUSTOMER"))
+                .thenReturn(Optional.of(customerRole));
+
+        when(passwordEncoder.encode(anyString()))
+                .thenReturn("encoded");
 
         Response<?> res = authService.register(req);
 
@@ -183,10 +195,16 @@ class AuthServiceImplTest {
         req.setAddress("City");
         req.setRoles(List.of("ADMIN", "INVALID_ROLE"));
 
-        when(userRepository.existsByEmail("multi2@example.com")).thenReturn(false);
+        when(userRepository.existsByEmail("multi2@example.com"))
+                .thenReturn(false);
 
-        when(roleRepository.findByName("ADMIN")).thenReturn(Optional.of(new Role("ADMIN")));
-        when(roleRepository.findByName("INVALID_ROLE")).thenReturn(Optional.empty());
+        Role adminRole = new Role(1L, "ADMIN");
+
+        when(roleRepository.findByName("ADMIN"))
+                .thenReturn(Optional.of(adminRole));
+
+        when(roleRepository.findByName("INVALID_ROLE"))
+                .thenReturn(Optional.empty());
 
         assertThrows(NotFoundException.class,
                 () -> authService.register(req));
