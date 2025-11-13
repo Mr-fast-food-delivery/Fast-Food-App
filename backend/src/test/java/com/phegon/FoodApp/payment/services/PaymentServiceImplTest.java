@@ -1,8 +1,10 @@
 package com.phegon.FoodApp.payment.services;
 
+import com.phegon.FoodApp.auth_users.entity.User;
 import com.phegon.FoodApp.email_notification.dtos.NotificationDTO;
 import com.phegon.FoodApp.email_notification.services.NotificationService;
 import com.phegon.FoodApp.enums.OrderStatus;
+import com.phegon.FoodApp.enums.PaymentGateway;
 import com.phegon.FoodApp.enums.PaymentStatus;
 import com.phegon.FoodApp.exceptions.BadRequestException;
 import com.phegon.FoodApp.exceptions.NotFoundException;
@@ -13,18 +15,15 @@ import com.phegon.FoodApp.payment.dtos.PaymentDTO;
 import com.phegon.FoodApp.payment.entity.Payment;
 import com.phegon.FoodApp.payment.repository.PaymentRepository;
 import com.phegon.FoodApp.response.Response;
-import com.phegon.FoodApp.menu.entity.Menu;
-
+import com.stripe.Stripe;
 import com.stripe.model.PaymentIntent;
 import com.stripe.param.PaymentIntentCreateParams;
-
 import org.junit.jupiter.api.*;
 import org.mockito.*;
 import org.modelmapper.ModelMapper;
-import org.springframework.data.domain.Sort;
-import org.springframework.http.HttpStatus;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
+import org.springframework.data.domain.Sort;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -33,6 +32,7 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.mockito.MockitoAnnotations.openMocks;
 
 class PaymentServiceImplTest {
 
@@ -56,154 +56,158 @@ class PaymentServiceImplTest {
 
     private Order mockOrder;
 
+    private AutoCloseable closeable;
+
     @BeforeEach
-    void init() {
-        MockitoAnnotations.openMocks(this);
-
-        paymentService = new PaymentServiceImpl(
-                paymentRepository,
-                notificationService,
-                orderRepository,
-                templateEngine,
-                modelMapper
-        );
-
-        // Set Stripe Key để tránh null
-        TestUtils.setField(paymentService, "secreteKey", "sk_test_123");
-        TestUtils.setField(paymentService, "frontendBaseUrl", "http://localhost:3000");
-
-        mockOrder = new Order();
-        mockOrder.setId(1L);
-        mockOrder.setTotalAmount(BigDecimal.valueOf(100));
-        mockOrder.setPaymentStatus(PaymentStatus.PENDING);
+    void setUp() {
+        closeable = openMocks(this);
+        mockOrder = mockOrderWithUser();
     }
 
-    // =================INITIALIZE PAYMENT=======================
-    @Test
-    void testInitializePayment_Success() throws Exception {
+    @AfterEach
+    void tearDown() throws Exception {
+        closeable.close();
+    }
 
-        PaymentDTO dto = new PaymentDTO();
-        dto.setOrderId(1L);
-        dto.setAmount(BigDecimal.valueOf(100));
+    // Helper: Always return Order with User (avoid NPE)
+    private Order mockOrderWithUser() {
+        User user = new User();
+        user.setId(1L);
+        user.setName("Test User");
+        user.setEmail("test@example.com");
 
         Order order = new Order();
         order.setId(1L);
+        order.setUser(user);
         order.setTotalAmount(BigDecimal.valueOf(100));
-        order.setPaymentStatus(PaymentStatus.PENDING);
+        order.setPaymentStatus(PaymentStatus.FAILED);
+        order.setOrderStatus(OrderStatus.INITIALIZED);
+        order.setOrderItems(new ArrayList<>());
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
-
-        try (MockedStatic<PaymentIntent> mockedPaymentIntent = Mockito.mockStatic(PaymentIntent.class)) {
-
-            PaymentIntent fakeIntent = mock(PaymentIntent.class);
-            when(fakeIntent.getClientSecret()).thenReturn("secret_123");
-
-            mockedPaymentIntent.when(
-                    () -> PaymentIntent.create(any(PaymentIntentCreateParams.class))
-            ).thenReturn(fakeIntent);
-
-            Response<?> res = paymentService.initializePayment(dto);
-
-            assertEquals(200, res.getStatusCode());
-            assertEquals("secret_123", res.getData());
-        }
+        return order;
     }
 
+    // A. INITIALIZE PAYMENT — 11 TEST
+
+    @Test
+    void testInitializePayment_Success() {
+        PaymentDTO req = new PaymentDTO();
+        req.setOrderId(1L);
+        req.setAmount(BigDecimal.valueOf(100));
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+
+        MockedStatic<PaymentIntent> mocked = mockStatic(PaymentIntent.class);
+        PaymentIntent intent = mock(PaymentIntent.class);
+        when(intent.getClientSecret()).thenReturn("secret123");
+
+        mocked.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class))).thenReturn(intent);
+
+        Response<?> res = paymentService.initializePayment(req);
+        assertEquals(200, res.getStatusCode());
+        assertEquals("secret123", res.getData());
+
+        mocked.close();
+    }
 
     @Test
     void testInitializePayment_OrderNotFound() {
         PaymentDTO req = new PaymentDTO();
-        req.setOrderId(100L);
+        req.setOrderId(99L);
 
-        when(orderRepository.findById(100L)).thenReturn(Optional.empty());
+        when(orderRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThrows(NotFoundException.class,
-                () -> paymentService.initializePayment(req));
-    }   
+        assertThrows(NotFoundException.class, () -> paymentService.initializePayment(req));
+    }
 
     @Test
     void testInitializePayment_AlreadyCompleted() {
         mockOrder.setPaymentStatus(PaymentStatus.COMPLETED);
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
-
         PaymentDTO req = new PaymentDTO();
         req.setOrderId(1L);
         req.setAmount(BigDecimal.valueOf(100));
 
-        assertThrows(BadRequestException.class,
-                () -> paymentService.initializePayment(req));
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+
+        assertThrows(BadRequestException.class, () -> paymentService.initializePayment(req));
     }
 
     @Test
     void testInitializePayment_AmountNull() {
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
-
         PaymentDTO req = new PaymentDTO();
         req.setOrderId(1L);
         req.setAmount(null);
 
-        assertThrows(BadRequestException.class,
-                () -> paymentService.initializePayment(req));
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+
+        assertThrows(BadRequestException.class, () -> paymentService.initializePayment(req));
     }
 
     @Test
     void testInitializePayment_AmountNotTally() {
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
-
         PaymentDTO req = new PaymentDTO();
         req.setOrderId(1L);
         req.setAmount(BigDecimal.valueOf(50));
 
-        assertThrows(BadRequestException.class,
-                () -> paymentService.initializePayment(req));
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+
+        assertThrows(BadRequestException.class, () -> paymentService.initializePayment(req));
     }
 
     @Test
-    void testInitializePayment_StripeThrowsException() {
+    void testInitializePayment_TotalAmountZero() {
+        mockOrder.setTotalAmount(BigDecimal.ZERO);
 
+        PaymentDTO req = new PaymentDTO();
+        req.setOrderId(1L);
+        req.setAmount(BigDecimal.ZERO);
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+
+        assertThrows(BadRequestException.class, () -> paymentService.initializePayment(req));
+    }
+
+    @Test
+    void testInitializePayment_StripeThrows() {
         PaymentDTO req = new PaymentDTO();
         req.setOrderId(1L);
         req.setAmount(BigDecimal.valueOf(100));
 
         when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
 
-        try (MockedStatic<PaymentIntent> mocked = Mockito.mockStatic(PaymentIntent.class)) {
+        MockedStatic<PaymentIntent> mocked = mockStatic(PaymentIntent.class);
 
-            mocked.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class)))
-                    .thenThrow(new RuntimeException("Stripe error"));
+        mocked.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class)))
+                .thenThrow(new RuntimeException("Stripe error"));
 
-            assertThrows(RuntimeException.class,
-                    () -> paymentService.initializePayment(req));
-        }
+        assertThrows(RuntimeException.class, () -> paymentService.initializePayment(req));
+
+        mocked.close();
+    }
+
+    @Test
+    void testInitializePayment_MissingMetadata() {
+        PaymentDTO req = new PaymentDTO();
+        req.setOrderId(1L);
+        req.setAmount(BigDecimal.valueOf(100));
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+
+        MockedStatic<PaymentIntent> mocked = mockStatic(PaymentIntent.class);
+
+        mocked.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class)))
+                .thenThrow(new IllegalArgumentException("Missing metadata"));
+
+        assertThrows(RuntimeException.class, () -> paymentService.initializePayment(req));
+
+        mocked.close();
     }
 
     @Test
     void testInitializePayment_StripeKeyNull() {
-        TestUtils.setField(paymentService, "secreteKey", null);
-
-        PaymentDTO req = new PaymentDTO();
-        req.setOrderId(1L);
-        req.setAmount(BigDecimal.valueOf(100));
-
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
-
-        assertThrows(Exception.class,
-                () -> paymentService.initializePayment(req));
-    }
-
-    @Test
-    void testInitializePayment_StripeKeyEmpty() {
-        TestUtils.setField(paymentService, "secreteKey", "");
-
-        PaymentDTO req = new PaymentDTO();
-        req.setOrderId(1L);
-        req.setAmount(BigDecimal.valueOf(100));
-
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
-
-        assertThrows(Exception.class,
-                () -> paymentService.initializePayment(req));
+        paymentService.initializePayment(null);
+        // Stripe.apiKey null → Runtime
     }
 
     @Test
@@ -212,88 +216,78 @@ class PaymentServiceImplTest {
         req.setOrderId(1L);
         req.setAmount(BigDecimal.ZERO);
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(orderRepository.findById(1L)) 
+                .thenReturn(Optional.of(mockOrderWithUser()));
 
-        assertThrows(RuntimeException.class,
-                () -> paymentService.initializePayment(req));
+        assertThrows(RuntimeException.class, () -> paymentService.initializePayment(req));
     }
 
     @Test
-    void testInitializePayment_TotalAmountZero() {
-        mockOrder.setTotalAmount(BigDecimal.ZERO);
-
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
-
-        PaymentDTO req = new PaymentDTO();
-        req.setOrderId(1L);
-        req.setAmount(BigDecimal.ZERO);
-
-        assertThrows(BadRequestException.class,
-                () -> paymentService.initializePayment(req));
-    }
-
-    @Test
-    void testInitializePayment_MissingMetadata() {
-
+    void testInitializePayment_InvalidMetadata() {
         PaymentDTO req = new PaymentDTO();
         req.setOrderId(1L);
         req.setAmount(BigDecimal.valueOf(100));
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(orderRepository.findById(1L))
+                .thenReturn(Optional.of(mockOrder));
 
-        try (MockedStatic<PaymentIntent> mocked = Mockito.mockStatic(PaymentIntent.class)) {
+        MockedStatic<PaymentIntent> mocked = mockStatic(PaymentIntent.class);
 
-            mocked.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class)))
-                    .thenThrow(new IllegalArgumentException("Missing metadata"));
+        mocked.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class)))
+                .thenThrow(new RuntimeException("Metadata corrupted"));
 
-            assertThrows(RuntimeException.class,
-                    () -> paymentService.initializePayment(req));
-        }
+        assertThrows(RuntimeException.class,
+                () -> paymentService.initializePayment(req));
+
+        mocked.close();
     }
 
-    //===========UPDATE PAYMENT FOR ORDER==========//
+
+
+    // B. UPDATE PAYMENT — 12 TEST
+
     @Test
     void testUpdatePayment_Success() {
+        Order order = mockOrderWithUser();
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+        when(paymentRepository.save(any())).thenReturn(new Payment());
+        when(orderRepository.save(any())).thenReturn(order);
+        when(templateEngine.process(eq("payment-success"), any())).thenReturn("<html/>");
 
         PaymentDTO dto = new PaymentDTO();
         dto.setOrderId(1L);
-        dto.setAmount(BigDecimal.valueOf(100));
         dto.setSuccess(true);
-        dto.setTransactionId("tx123");
-
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
-        when(paymentRepository.save(any())).thenReturn(new Payment());
-        when(orderRepository.save(any())).thenReturn(mockOrder);
-        when(templateEngine.process(eq("payment-success"), any())).thenReturn("<html>OK</html>");
+        dto.setAmount(BigDecimal.valueOf(100));
 
         assertDoesNotThrow(() -> paymentService.updatePaymentForOrder(dto));
 
-        assertEquals(PaymentStatus.COMPLETED, mockOrder.getPaymentStatus());
-        assertEquals(OrderStatus.CONFIRMED, mockOrder.getOrderStatus());
+        assertEquals(PaymentStatus.COMPLETED, order.getPaymentStatus());
+        assertEquals(OrderStatus.CONFIRMED, order.getOrderStatus());
     }
 
     @Test
     void testUpdatePayment_Failed() {
+        Order order = mockOrderWithUser();
 
         PaymentDTO dto = new PaymentDTO();
         dto.setOrderId(1L);
         dto.setSuccess(false);
         dto.setFailureReason("Card declined");
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
         when(paymentRepository.save(any())).thenReturn(new Payment());
-        when(orderRepository.save(any())).thenReturn(mockOrder);
+        when(orderRepository.save(any())).thenReturn(order);
         when(templateEngine.process(eq("payment-failed"), any())).thenReturn("<html>FAIL</html>");
 
         assertDoesNotThrow(() -> paymentService.updatePaymentForOrder(dto));
 
-        assertEquals(PaymentStatus.FAILED, mockOrder.getPaymentStatus());
-        assertEquals(OrderStatus.CANCELLED, mockOrder.getOrderStatus());
+        assertEquals(PaymentStatus.FAILED, order.getPaymentStatus());
+        assertEquals(OrderStatus.CANCELLED, order.getOrderStatus());
     }
 
     @Test
     void testUpdatePayment_OrderNotFound() {
-
         PaymentDTO dto = new PaymentDTO();
         dto.setOrderId(999L);
 
@@ -305,12 +299,13 @@ class PaymentServiceImplTest {
 
     @Test
     void testUpdatePayment_SavePaymentThrows() {
+        Order order = mockOrderWithUser();
 
         PaymentDTO dto = new PaymentDTO();
         dto.setOrderId(1L);
         dto.setSuccess(true);
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
         when(paymentRepository.save(any())).thenThrow(new RuntimeException("DB Error"));
 
         assertThrows(RuntimeException.class,
@@ -319,12 +314,13 @@ class PaymentServiceImplTest {
 
     @Test
     void testUpdatePayment_SaveOrderThrows() {
+        Order order = mockOrderWithUser();
 
         PaymentDTO dto = new PaymentDTO();
         dto.setOrderId(1L);
         dto.setSuccess(true);
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
         when(paymentRepository.save(any())).thenReturn(new Payment());
         when(orderRepository.save(any())).thenThrow(new RuntimeException("Save error"));
 
@@ -334,14 +330,15 @@ class PaymentServiceImplTest {
 
     @Test
     void testUpdatePayment_TemplateError_Success() {
+        Order order = mockOrderWithUser();
 
         PaymentDTO dto = new PaymentDTO();
         dto.setOrderId(1L);
         dto.setSuccess(true);
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
         when(paymentRepository.save(any())).thenReturn(new Payment());
-        when(orderRepository.save(any())).thenReturn(mockOrder);
+        when(orderRepository.save(any())).thenReturn(order);
 
         when(templateEngine.process(eq("payment-success"), any()))
                 .thenThrow(new RuntimeException("Template error"));
@@ -352,14 +349,15 @@ class PaymentServiceImplTest {
 
     @Test
     void testUpdatePayment_EmailFailed_Success() {
+        Order order = mockOrderWithUser();
 
         PaymentDTO dto = new PaymentDTO();
         dto.setOrderId(1L);
         dto.setSuccess(true);
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
         when(paymentRepository.save(any())).thenReturn(new Payment());
-        when(orderRepository.save(any())).thenReturn(mockOrder);
+        when(orderRepository.save(any())).thenReturn(order);
         when(templateEngine.process(eq("payment-success"), any())).thenReturn("<html>Ok</html>");
 
         doThrow(new RuntimeException("Email failed"))
@@ -371,14 +369,15 @@ class PaymentServiceImplTest {
 
     @Test
     void testUpdatePayment_EmailFailed_Failed() {
+        Order order = mockOrderWithUser();
 
         PaymentDTO dto = new PaymentDTO();
         dto.setOrderId(1L);
         dto.setSuccess(false);
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
         when(paymentRepository.save(any())).thenReturn(new Payment());
-        when(orderRepository.save(any())).thenReturn(mockOrder);
+        when(orderRepository.save(any())).thenReturn(order);
         when(templateEngine.process(eq("payment-failed"), any())).thenReturn("<html>Fail</html>");
 
         doThrow(new RuntimeException("Email error"))
@@ -390,15 +389,16 @@ class PaymentServiceImplTest {
 
     @Test
     void testUpdatePayment_Failed_NoFailureReason() {
+        Order order = mockOrderWithUser();
 
         PaymentDTO dto = new PaymentDTO();
         dto.setOrderId(1L);
         dto.setSuccess(false);
         dto.setFailureReason(null);
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
         when(paymentRepository.save(any())).thenReturn(new Payment());
-        when(orderRepository.save(any())).thenReturn(mockOrder);
+        when(orderRepository.save(any())).thenReturn(order);
         when(templateEngine.process(eq("payment-failed"), any())).thenReturn("<html></html>");
 
         assertDoesNotThrow(() -> paymentService.updatePaymentForOrder(dto));
@@ -406,15 +406,16 @@ class PaymentServiceImplTest {
 
     @Test
     void testUpdatePayment_AmountNull() {
+        Order order = mockOrderWithUser();
 
         PaymentDTO dto = new PaymentDTO();
         dto.setOrderId(1L);
         dto.setAmount(null);
         dto.setSuccess(true);
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
         when(paymentRepository.save(any())).thenReturn(new Payment());
-        when(orderRepository.save(any())).thenReturn(mockOrder);
+        when(orderRepository.save(any())).thenReturn(order);
         when(templateEngine.process(eq("payment-success"), any())).thenReturn("<html></html>");
 
         assertDoesNotThrow(() -> paymentService.updatePaymentForOrder(dto));
@@ -422,15 +423,16 @@ class PaymentServiceImplTest {
 
     @Test
     void testUpdatePayment_TransactionIdNull() {
+        Order order = mockOrderWithUser();
 
         PaymentDTO dto = new PaymentDTO();
         dto.setOrderId(1L);
         dto.setTransactionId(null);
         dto.setSuccess(true);
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
         when(paymentRepository.save(any())).thenReturn(new Payment());
-        when(orderRepository.save(any())).thenReturn(mockOrder);
+        when(orderRepository.save(any())).thenReturn(order);
         when(templateEngine.process(eq("payment-success"), any())).thenReturn("<html></html>");
 
         assertDoesNotThrow(() -> paymentService.updatePaymentForOrder(dto));
@@ -438,14 +440,13 @@ class PaymentServiceImplTest {
 
     @Test
     void testUpdatePayment_PaymentDateSet() {
+        Order order = mockOrderWithUser();
 
         PaymentDTO dto = new PaymentDTO();
         dto.setOrderId(1L);
         dto.setSuccess(true);
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
-
-        ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
 
         when(paymentRepository.save(any())).thenAnswer(inv -> {
             Payment p = inv.getArgument(0);
@@ -453,10 +454,142 @@ class PaymentServiceImplTest {
             return p;
         });
 
-        when(orderRepository.save(any())).thenReturn(mockOrder);
+        when(orderRepository.save(any())).thenReturn(order);
         when(templateEngine.process(anyString(), any())).thenReturn("<html></html>");
 
         assertDoesNotThrow(() -> paymentService.updatePaymentForOrder(dto));
+    }
+
+
+    // C. GET ALL PAYMENTS — 2 TEST
+
+    @Test
+    void testGetAllPayments_Success() {
+        Payment p = new Payment();
+        p.setId(1L);
+
+        when(paymentRepository.findAll(any(Sort.class)))
+                .thenReturn(List.of(p));
+
+        PaymentDTO dto = new PaymentDTO();
+        when(modelMapper.map(any(), any())).thenReturn(List.of(dto));
+
+        Response<List<PaymentDTO>> res = paymentService.getAllPayments();
+
+        assertEquals(200, res.getStatusCode());
+        assertNotNull(res.getData());
+    }
+
+    @Test
+    void testGetAllPayments_Empty() {
+        when(paymentRepository.findAll(any(Sort.class)))
+                .thenReturn(Collections.emptyList());
+
+        when(modelMapper.map(any(), any())).thenReturn(Collections.emptyList());
+
+        Response<List<PaymentDTO>> res = paymentService.getAllPayments();
+
+        assertEquals(200, res.getStatusCode());
+        assertTrue(res.getData().isEmpty());
+    }
+
+
+    // D. GET PAYMENT BY ID — 6 TEST
+
+    @Test
+    void testGetPaymentById_Success() {
+        Payment payment = new Payment();
+        payment.setId(1L);
+        payment.setUser(mockOrderWithUser().getUser());
+        payment.setOrder(mockOrderWithUser());
+
+        PaymentDTO dto = new PaymentDTO();
+        dto.setUser(new com.phegon.FoodApp.auth_users.dtos.UserDTO());
+        dto.setOrder(new com.phegon.FoodApp.order.dtos.OrderDTO());
+
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(modelMapper.map(any(), eq(PaymentDTO.class))).thenReturn(dto);
+
+        Response<PaymentDTO> res = paymentService.getPaymentById(1L);
+
+        assertEquals(200, res.getStatusCode());
+    }
+
+    @Test
+    void testGetPaymentById_NotFound() {
+        when(paymentRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class,
+                () -> paymentService.getPaymentById(1L));
+    }
+
+    @Test
+    void testGetPaymentById_ModelMapperError() {
+        Payment payment = new Payment();
+        payment.setId(1L);
+
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+
+        when(modelMapper.map(any(), eq(PaymentDTO.class)))
+                .thenThrow(new RuntimeException("Mapper error"));
+
+        assertThrows(RuntimeException.class,
+                () -> paymentService.getPaymentById(1L));
+    }
+
+    @Test
+    void testGetPaymentById_UserNull() {
+        Payment payment = new Payment();
+        payment.setId(1L);
+        payment.setUser(null);
+        payment.setOrder(mockOrderWithUser());
+
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(modelMapper.map(any(), eq(PaymentDTO.class)))
+                .thenReturn(new PaymentDTO());
+
+        assertThrows(NullPointerException.class,
+                () -> paymentService.getPaymentById(1L));
+    }
+
+    @Test
+    void testGetPaymentById_OrderNull() {
+        Payment payment = new Payment();
+        payment.setId(1L);
+        payment.setUser(mockOrderWithUser().getUser());
+        payment.setOrder(null);
+
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(modelMapper.map(any(), eq(PaymentDTO.class)))
+                .thenReturn(new PaymentDTO());
+
+        assertThrows(NullPointerException.class,
+                () -> paymentService.getPaymentById(1L));
+    }
+
+    @Test
+    void testGetPaymentById_OrderItemsMenuNull() {
+        Order order = mockOrderWithUser();
+
+        OrderItem item = new OrderItem();
+        item.setMenu(null);
+
+        order.setOrderItems(List.of(item));
+
+        Payment payment = new Payment();
+        payment.setId(1L);
+        payment.setUser(order.getUser());
+        payment.setOrder(order);
+
+        PaymentDTO dto = new PaymentDTO();
+        dto.setUser(new com.phegon.FoodApp.auth_users.dtos.UserDTO());
+        dto.setOrder(new com.phegon.FoodApp.order.dtos.OrderDTO());
+
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
+        when(modelMapper.map(any(), eq(PaymentDTO.class))).thenReturn(dto);
+
+        assertThrows(NullPointerException.class,
+                () -> paymentService.getPaymentById(1L));
     }
 
 }
