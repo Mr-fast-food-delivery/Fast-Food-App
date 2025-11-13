@@ -1,5 +1,6 @@
 package com.phegon.FoodApp.order.services;
 
+import java.lang.reflect.Method;
 import com.phegon.FoodApp.auth_users.dtos.UserDTO;
 import com.phegon.FoodApp.auth_users.entity.User;
 import com.phegon.FoodApp.auth_users.services.UserService;
@@ -83,7 +84,7 @@ class OrderServiceImplTest {
     @BeforeEach
     void init() throws Exception {
         mockUser = buildUser(1L, "John Doe", "john@example.com", "123 Street");
-        mockCart = buildCartWithItems(mockUser);
+        mockCart = mockCartWithItemsWithItems(mockUser);
 
         // set basePaymentLink via reflection
         Field f = OrderServiceImpl.class.getDeclaredField("basePaymentLink");
@@ -102,7 +103,7 @@ class OrderServiceImplTest {
         return u;
     }
 
-    private Cart buildCartWithItems(User user) {
+    private Cart mockCartWithItemsWithItems(User user) {
         Cart cart = new Cart();
         cart.setId(10L);
         cart.setUser(user);
@@ -169,66 +170,86 @@ class OrderServiceImplTest {
         return dto;
     }
 
+    // ==== TEST HELPERS ==================================================== //
+
+    private User mockUserWithAddress() {
+        User user = new User();
+        user.setId(1L);
+        user.setName("Huy");
+        user.setEmail("huy@test.com");
+        user.setAddress("Ho Chi Minh");
+        return user;
+    }
+
+    private Cart mockCartWithItems() {
+        Cart cart = new Cart();
+
+        Menu menu = new Menu();
+        menu.setId(10L);
+        menu.setName("Pizza");
+
+        CartItem item = new CartItem();
+        item.setMenu(menu);
+        item.setQuantity(2);
+        item.setPricePerUnit(BigDecimal.valueOf(50));
+        item.setSubtotal(BigDecimal.valueOf(100));
+
+        cart.setCartItems(List.of(item));
+        return cart;
+    }
+
+    private Order mockSaveOrder() {
+        Order order = new Order();
+        order.setId(999L);
+        order.setOrderDate(LocalDateTime.now());
+        order.setTotalAmount(BigDecimal.valueOf(100));
+        return order;
+    }
+
+    private OrderDTO mockFullOrderDTO() {
+        OrderDTO dto = new OrderDTO();
+
+        dto.setId(1L);
+        dto.setOrderDate(LocalDateTime.now());
+        dto.setTotalAmount(BigDecimal.valueOf(100));
+
+        // User
+        UserDTO userDTO = new UserDTO();
+        userDTO.setAddress("HCM");
+        dto.setUser(userDTO);
+
+        // Items
+        MenuDTO menu = new MenuDTO();
+        menu.setName("Pizza");
+
+        OrderItemDTO item = new OrderItemDTO();
+        item.setQuantity(2);
+        item.setSubtotal(BigDecimal.valueOf(50));
+        item.setMenu(menu);
+
+        dto.setOrderItems(List.of(item));
+
+        return dto;
+    }
     // =========================================================
     // A. placeOrderFromCart()
     // =========================================================
     @Nested
     class PlaceOrderFromCartTests {
-        private OrderDTO fullOrderDTO;
-
-            @BeforeEach
-            void initFullOrderDTO() {
-                fullOrderDTO = new OrderDTO();
-                fullOrderDTO.setId(1L);
-                fullOrderDTO.setOrderDate(LocalDateTime.now());
-                fullOrderDTO.setTotalAmount(BigDecimal.TEN);
-
-                UserDTO u = new UserDTO();
-                u.setAddress("HN");
-                fullOrderDTO.setUser(u);
-
-                OrderItemDTO oi = new OrderItemDTO();
-                oi.setMenu(new MenuDTO());
-                oi.getMenu().setName("Pizza");
-                oi.setQuantity(1);
-                oi.setSubtotal(BigDecimal.TEN);
-                fullOrderDTO.setOrderItems(List.of(oi));
-            }
-
-            Cart buildCart() {
-                CartItem ci = new CartItem();
-                ci.setMenu(new Menu());
-                ci.setQuantity(1);
-                ci.setPricePerUnit(BigDecimal.TEN);
-                ci.setSubtotal(BigDecimal.TEN);
-
-                Cart c = new Cart();
-                c.setCartItems(List.of(ci));
-                return c;
-            }
-
-            Order savedOrder() {
-                Order o = new Order();
-                o.setId(1L);
-                o.setOrderItems(new ArrayList<>());
-                o.setTotalAmount(BigDecimal.TEN);
-                o.setOrderDate(LocalDateTime.now());
-                return o;
-            }
-
+        
         @Test
         void testPlaceOrder_Success() {
 
             mockUser.setAddress("HN");
 
             when(userService.getCurrentLoggedInUser()).thenReturn(mockUser);
-            when(cartRepository.findByUser_Id(mockUser.getId())).thenReturn(Optional.of(buildCart()));
+            when(cartRepository.findByUser_Id(mockUser.getId())).thenReturn(Optional.of(mockCartWithItems()));
 
-            lenient().when(orderRepository.save(any())).thenReturn(savedOrder());
+            lenient().when(orderRepository.save(any())).thenReturn(mockSaveOrder());
             lenient().when(orderItemRepository.saveAll(any())).thenReturn(List.of());
 
             when(modelMapper.map(any(Order.class), eq(OrderDTO.class)))
-                    .thenReturn(fullOrderDTO);
+                    .thenReturn(mockFullOrderDTO());
 
             when(templateEngine.process(eq("order-confirmation"), any()))
                     .thenReturn("<html/>");
@@ -324,13 +345,13 @@ class OrderServiceImplTest {
             mockUser.setAddress("HN");
 
             when(userService.getCurrentLoggedInUser()).thenReturn(mockUser);
-            when(cartRepository.findByUser_Id(mockUser.getId())).thenReturn(Optional.of(buildCart()));
+            when(cartRepository.findByUser_Id(mockUser.getId())).thenReturn(Optional.of(mockCartWithItems()));
 
-            lenient().when(orderRepository.save(any())).thenReturn(savedOrder());
+            lenient().when(orderRepository.save(any())).thenReturn(mockSaveOrder());
             lenient().when(orderItemRepository.saveAll(any())).thenReturn(List.of());
 
             when(modelMapper.map(any(Order.class), eq(OrderDTO.class)))
-                    .thenReturn(fullOrderDTO);
+                    .thenReturn(mockFullOrderDTO());
 
             when(templateEngine.process(anyString(), any())).thenReturn("<html/>");
 
@@ -344,13 +365,13 @@ class OrderServiceImplTest {
             mockUser.setAddress("HN");
 
             when(userService.getCurrentLoggedInUser()).thenReturn(mockUser);
-            when(cartRepository.findByUser_Id(mockUser.getId())).thenReturn(Optional.of(buildCart()));
+            when(cartRepository.findByUser_Id(mockUser.getId())).thenReturn(Optional.of(mockCartWithItems()));
 
-            lenient().when(orderRepository.save(any())).thenReturn(savedOrder());
+            lenient().when(orderRepository.save(any())).thenReturn(mockSaveOrder());
             lenient().when(orderItemRepository.saveAll(any())).thenReturn(List.of());
 
             when(modelMapper.map(any(Order.class), eq(OrderDTO.class)))
-                    .thenReturn(fullOrderDTO);
+                    .thenReturn(mockFullOrderDTO());
 
             when(templateEngine.process(anyString(), any())).thenReturn("<html/>");
 
@@ -364,13 +385,13 @@ class OrderServiceImplTest {
             mockUser.setAddress("HN");
 
             when(userService.getCurrentLoggedInUser()).thenReturn(mockUser);
-            when(cartRepository.findByUser_Id(mockUser.getId())).thenReturn(Optional.of(buildCart()));
+            when(cartRepository.findByUser_Id(mockUser.getId())).thenReturn(Optional.of(mockCartWithItems()));
 
-            lenient().when(orderRepository.save(any())).thenReturn(savedOrder());
+            lenient().when(orderRepository.save(any())).thenReturn(mockSaveOrder());
             lenient().when(orderItemRepository.saveAll(any())).thenReturn(List.of());
 
             when(modelMapper.map(any(Order.class), eq(OrderDTO.class)))
-                    .thenReturn(fullOrderDTO);
+                    .thenReturn(mockFullOrderDTO());
 
             when(templateEngine.process(anyString(), any())).thenReturn("<html/>");
 
@@ -420,22 +441,25 @@ class OrderServiceImplTest {
 
         @Test
         void testPlaceOrder_ClearCartThrows() {
-            when(userService.getCurrentLoggedInUser()).thenReturn(mockUser);
-            when(cartRepository.findByUser_Id(mockUser.getId())).thenReturn(Optional.of(mockCart));
+            User user = mockUserWithAddress();
+            Cart cart = mockCartWithItems();
+            Order mockSaveOrder = mockSaveOrder();
 
-            when(orderRepository.save(any(Order.class))).thenReturn(new Order());
-            when(orderItemRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
-            when(modelMapper.map(any(Order.class), eq(OrderDTO.class)))
-                    .thenReturn(new OrderDTO());
-            when(templateEngine.process(eq("order-confirmation"), any(Context.class)))
-                    .thenReturn("<html></html>");
+            when(userService.getCurrentLoggedInUser()).thenReturn(user);
+            when(cartRepository.findByUser_Id(user.getId())).thenReturn(Optional.of(cart));
 
-            doThrow(new RuntimeException("Cart clear error"))
+            // Only necessary stub before clearShoppingCart() is called
+            when(orderRepository.save(any())).thenReturn(mockSaveOrder);
+
+            // This is where the test expects error
+            doThrow(new RuntimeException("clear error"))
                     .when(cartService).clearShoppingCart();
 
-            assertThrows(RuntimeException.class,
-                    () -> orderService.placeOrderFromCart());
+            assertThrows(RuntimeException.class, () -> orderService.placeOrderFromCart());
+
+            verify(cartService, times(1)).clearShoppingCart();
         }
+
 
         @Test
         void testPlaceOrder_SendEmailCalled() {
@@ -470,13 +494,13 @@ class OrderServiceImplTest {
             mockUser.setAddress("HN");
 
             when(userService.getCurrentLoggedInUser()).thenReturn(mockUser);
-            when(cartRepository.findByUser_Id(mockUser.getId())).thenReturn(Optional.of(buildCart()));
+            when(cartRepository.findByUser_Id(mockUser.getId())).thenReturn(Optional.of(mockCartWithItems()));
 
-            lenient().when(orderRepository.save(any())).thenReturn(savedOrder());
+            lenient().when(orderRepository.save(any())).thenReturn(mockSaveOrder());
             lenient().when(orderItemRepository.saveAll(any())).thenReturn(List.of());
 
             when(modelMapper.map(any(Order.class), eq(OrderDTO.class)))
-                    .thenReturn(fullOrderDTO);
+                    .thenReturn(mockFullOrderDTO());
 
             when(templateEngine.process(anyString(), any()))
                     .thenReturn("<html/>");
@@ -934,78 +958,44 @@ class OrderServiceImplTest {
     class OrderEmailTests {
 
         @Test
-        void testOrderEmail_Success() {
-
-            mockUser.setAddress("HCM");
-
-            Menu menu = new Menu();
-            menu.setName("Pizza");
-
-            CartItem ci = new CartItem();
-            ci.setMenu(menu);
-            ci.setQuantity(2);
-            ci.setPricePerUnit(BigDecimal.valueOf(10));
-            ci.setSubtotal(BigDecimal.valueOf(20));
-
-            Cart cart = new Cart();
-            cart.setCartItems(List.of(ci));
-
-            when(userService.getCurrentLoggedInUser()).thenReturn(mockUser);
-            when(cartRepository.findByUser_Id(mockUser.getId()))
-                    .thenReturn(Optional.of(cart));
-
-            Order savedOrder = new Order();
-            savedOrder.setId(9L);
-            savedOrder.setOrderItems(new ArrayList<>());
-
-            when(orderRepository.save(any())).thenReturn(savedOrder);
-            when(orderItemRepository.saveAll(any())).thenReturn(List.of());
-
-            when(templateEngine.process(eq("order-confirmation"), any()))
-                    .thenReturn("<html/>");
-
-            OrderDTO mapped = new OrderDTO();
-            mapped.setId(9L);
-            mapped.setUser(new UserDTO());
-            mapped.setOrderItems(List.of(new OrderItemDTO()));
+        void testOrderEmail_Success() throws Exception {
+            User user = mockUserWithAddress();
+            OrderDTO dto = mockFullOrderDTO();
 
             when(modelMapper.map(any(Order.class), eq(OrderDTO.class)))
-                    .thenReturn(mapped);
+                    .thenReturn(dto);
 
-            assertDoesNotThrow(() -> orderService.placeOrderFromCart());
+            when(templateEngine.process(eq("order-confirmation"), any()))
+                    .thenReturn("<html>Email OK</html>");
 
-            verify(notificationService, times(1)).sendEmail(any());
+            doNothing().when(notificationService).sendEmail(any());
+
+            // invoke private method
+            Method m = OrderServiceImpl.class
+                    .getDeclaredMethod("sendOrderConfirmationEmail", User.class, OrderDTO.class);
+            m.setAccessible(true);
+
+            assertDoesNotThrow(() -> m.invoke(orderService, user, dto));
         }
 
         @Test
-        void testOrderEmail_TemplateError() {
-
-            mockUser.setAddress("HN");
-
-            Cart cart = new Cart();
-            CartItem ci = new CartItem();
-            ci.setMenu(new Menu());
-            ci.setSubtotal(BigDecimal.TEN);
-            cart.setCartItems(List.of(ci));
-
-            when(userService.getCurrentLoggedInUser()).thenReturn(mockUser);
-            when(cartRepository.findByUser_Id(mockUser.getId()))
-                    .thenReturn(Optional.of(cart));
-
-            Order savedOrder = new Order();
-            savedOrder.setOrderItems(new ArrayList<>());
-
-            when(orderRepository.save(any())).thenReturn(savedOrder);
-            when(orderItemRepository.saveAll(any())).thenReturn(List.of());
+        void testOrderEmail_TemplateError() throws Exception {
+            User user = mockUserWithAddress();
+            OrderDTO dto = mockFullOrderDTO();
 
             when(modelMapper.map(any(Order.class), eq(OrderDTO.class)))
-                    .thenReturn(new OrderDTO());
+                    .thenReturn(dto);
 
+            // Only stub templateEngine (template itself fails)
             when(templateEngine.process(eq("order-confirmation"), any()))
-                    .thenThrow(new RuntimeException("Template broken"));
+                    .thenThrow(new RuntimeException("template failed"));
 
-            assertThrows(RuntimeException.class,
-                    () -> orderService.placeOrderFromCart());
+            Method m = OrderServiceImpl.class
+                    .getDeclaredMethod("sendOrderConfirmationEmail", User.class, OrderDTO.class);
+            m.setAccessible(true);
+
+            assertThrows(RuntimeException.class, () -> m.invoke(orderService, user, dto));
         }
+
     }
 }
