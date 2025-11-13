@@ -221,7 +221,7 @@ class PaymentServiceImplTest {
     @Test
     void testInitializePayment_StripeKeyNull() throws Exception {
 
-        // stripe key null
+        // set giá trị secreteKey = null
         Field f = PaymentServiceImpl.class.getDeclaredField("secreteKey");
         f.setAccessible(true);
         f.set(paymentService, null);
@@ -232,13 +232,16 @@ class PaymentServiceImplTest {
 
         when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
 
-        mockStatic(PaymentIntent.class)
-                .when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class)))
-                .thenThrow(new RuntimeException("Stripe key missing"));
+        try (MockedStatic<PaymentIntent> mocked = mockStatic(PaymentIntent.class)) {
 
-        assertThrows(RuntimeException.class,
-                () -> paymentService.initializePayment(req));
+            mocked.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class)))
+                    .thenThrow(new RuntimeException("Stripe key missing"));
+
+            assertThrows(RuntimeException.class,
+                    () -> paymentService.initializePayment(req));
+        }
     }
+
 
 
     @Test
