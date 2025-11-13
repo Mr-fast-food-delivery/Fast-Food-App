@@ -245,4 +245,23 @@ class AuthServiceImplTest {
 
         assertThrows(NotFoundException.class, () -> authService.login(req));
     }
+
+    // ===================== LOGIN MISS EMAIL =====================
+    @Test
+    void testLoginMissingEmail() {
+        LoginRequest req = new LoginRequest();
+        req.setPassword("Secret123");
+
+        assertThrows(BadRequestException.class, () -> authService.login(req));
+    }
+
+    // ===================== LOGIN MISS PASSWORD =====================
+    @Test
+    void testLoginMissingPassword() {
+        LoginRequest req = new LoginRequest();
+        req.setEmail("MISSPASS@example.com");
+
+
+        assertThrows(BadRequestException.class, () -> authService.login(req));
+    }
 }

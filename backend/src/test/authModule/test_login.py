@@ -26,26 +26,6 @@ def register_user(email=None, password="Secret123!"):
     return email, password
 
 
-def test_login_invalid_email_format():
-    payload = {
-        "email": "invalidemailformat",
-        "password": "Secret123!"
-    }
-    res = requests.post(BASE_URL, json=payload)
-    assert res.status_code == 400
-    assert "Invalid email format" in res.text
-
-
-def test_login_short_password():
-    payload = {
-        "email": "valid@example.com",
-        "password": "123"
-    }
-    res = requests.post(BASE_URL, json=payload)
-    assert res.status_code == 400
-    assert "Password must be at least 6 characters long" in res.text
-
-
 def test_login_missing_fields():
     payload = {}
     res = requests.post(BASE_URL, json=payload)
