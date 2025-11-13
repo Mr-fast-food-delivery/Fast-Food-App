@@ -249,27 +249,24 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    void testInitializePayment_InvalidMetadata() {
+    void testInitializePayment_InvalidMetadata() throws Exception {
+
         PaymentDTO req = new PaymentDTO();
         req.setOrderId(1L);
         req.setAmount(BigDecimal.valueOf(100));
 
-        when(orderRepository.findById(1L))
-                .thenReturn(Optional.of(mockOrder));
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
 
-        MockedStatic<PaymentIntent> mocked = mockStatic(PaymentIntent.class);
+        try (MockedStatic<PaymentIntent> mocked = mockStatic(PaymentIntent.class)) {
 
-        mocked.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class)))
-                .thenThrow(new RuntimeException("Metadata corrupted"));
+            mocked.when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class)))
+                    .thenThrow(new IllegalArgumentException("Invalid metadata"));
 
-        assertThrows(RuntimeException.class,
-                () -> paymentService.initializePayment(req));
-
-        mocked.close();
+            assertThrows(RuntimeException.class,
+                    () -> paymentService.initializePayment(req));
+        }
     }
-
-
-
+    
     // B. UPDATE PAYMENT — 12 TEST
 
     @Test
