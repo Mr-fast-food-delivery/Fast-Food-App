@@ -23,14 +23,14 @@ def register_and_login():
         "password": password,
         "phoneNumber": "0911222333",
         "address": "Test Street",
-        "roles": ["customer"]
+        "roles": ["CUSTOMER"]
     }
 
     r = requests.post(REGISTER_URL, json=payload)
-    assert r.status_code == 200, f"❌ Register failed: {r.text}"
+    assert r.status_code == 200, f"Register failed: {r.text}"
 
     login_res = requests.post(LOGIN_URL, json={"email": email, "password": password})
-    assert login_res.status_code == 200, f"❌ Login failed: {login_res.text}"
+    assert login_res.status_code == 200, f"Login failed: {login_res.text}"
 
     token = login_res.json()["data"]["token"]
     return email, password, token
@@ -84,7 +84,6 @@ def test_get_current_user_expired_token():
     """
     email, password, token = register_and_login()
 
-    print("⏳ Đang chờ token hết hạn (giả lập 10 giây)...")
     time.sleep(10)  # phải khớp với EXPIRATION_TIME trong JwtUtils nếu bạn set ngắn
 
     headers = {"Authorization": f"Bearer {token}"}

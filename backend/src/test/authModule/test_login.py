@@ -19,7 +19,7 @@ def register_user(email=None, password="Secret123!"):
         "password": password,
         "phoneNumber": "0911222333",
         "address": "Test Street",
-        "roles": ["customer"]
+        "roles": ["CUSTOMER"]
     }
     res = requests.post(REGISTER_URL, json=payload)
     assert res.status_code == 200, f"Failed to register test user: {res.text}"

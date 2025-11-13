@@ -93,7 +93,7 @@ public class AuthServiceImpl implements AuthService{
                 .orElseThrow(() -> new BadRequestException("Invalid Email"));
 
         if (!user.isActive()) {
-            throw new NotFoundException("Account not active, Please contact customer support");
+            throw new NotFoundException("Account not active, Please contact CUSTOMER support");
         }
 
         if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {

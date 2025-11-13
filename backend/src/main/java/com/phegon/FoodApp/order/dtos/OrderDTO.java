@@ -28,7 +28,7 @@ public class OrderDTO {
 
     private PaymentStatus paymentStatus;
 
-    private UserDTO user; // Customer who is making/made the order
+    private UserDTO user; // CUSTOMER who is making/made the order
 
     private List<OrderItemDTO> orderItems;
 }

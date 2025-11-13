@@ -14,7 +14,7 @@ def test_register_success():
         "password": "Secret123!",
         "phoneNumber": "0911222333",
         "address": "123 Main Street",
-        "roles": ["customer"]
+        "roles": ["CUSTOMER"]
     }
     res = requests.post(BASE_URL, json=payload)
     assert res.status_code == 200
@@ -29,7 +29,7 @@ def test_register_invalid_password():
         "password": "123",  # Invalid password (too short)
         "phoneNumber": "0901234567",
         "address": "Unknown",
-        "roles": ["customer"]
+        "roles": ["CUSTOMER"]
     }
     res = requests.post(BASE_URL, json=payload)
     assert res.status_code == 400
@@ -42,7 +42,7 @@ def test_register_invalid_phoneNumber_too_short():
         "password": "ValidPass1!",
         "phoneNumber": "091234567",  # Invalid phone number (too short)
         "address": "Anywhere",
-        "roles": ["customer"]
+        "roles": ["CUSTOMER"]
     }
     res = requests.post(BASE_URL, json=payload)
     assert res.status_code == 400
@@ -55,7 +55,7 @@ def test_register_invalid_phoneNumber_include_letters():
         "password": "ValidPass1!",
         "phoneNumber": "55InvalidPhone",  # Invalid phone number
         "address": "Someplace",
-        "roles": ["customer"]
+        "roles": ["CUSTOMER"]
     }
     res = requests.post(BASE_URL, json=payload)
     assert res.status_code == 400
@@ -68,7 +68,7 @@ def test_invalid_email_format():
         "password": "Pass123!",
         "phoneNumber": "0901234567",
         "address": "123 Test St",
-        "roles": ["customer"]
+        "roles": ["CUSTOMER"]
     }
     res = requests.post(BASE_URL, json=payload)
     assert res.status_code == 400
@@ -83,7 +83,7 @@ def test_register_email_exists():
         "password": "Pass123!",
         "phoneNumber": "0909999999",
         "address": "City",
-        "roles": ["customer"]
+        "roles": ["CUSTOMER"]
     })
     assert first.status_code == 200
 
@@ -94,7 +94,7 @@ def test_register_email_exists():
         "password": "Pass123!",
         "phoneNumber": "0908888888",
         "address": "City",
-        "roles": ["customer"]
+        "roles": ["CUSTOMER"]
     })
     assert res.status_code == 400
     assert "Email already exists" in res.text
@@ -135,7 +135,7 @@ def test_register_missing_email():
         "password": "Pass123!",
         "phoneNumber": "0905555555",
         "address": "Somewhere",
-        "roles": ["customer"]
+        "roles": ["CUSTOMER"]
     }
     res = requests.post(BASE_URL, json=payload)
     assert res.status_code in (400, 422)
@@ -150,7 +150,7 @@ def test_register_missing_name():
         "email":random_email(),
         "phoneNumber": "0905555555",
         "address": "Somewhere",
-        "roles": ["customer"]
+        "roles": ["CUSTOMER"]
     }
     res = requests.post(BASE_URL, json=payload)
     assert res.status_code in (400, 422)
@@ -161,7 +161,7 @@ def test_register_missing_password():
         "email":random_email(),
         "phoneNumber": "0905555555",
         "address": "Somewhere",
-        "roles": ["customer"]
+        "roles": ["CUSTOMER"]
     }
     res = requests.post(BASE_URL, json=payload)
     assert res.status_code in (400, 422)
@@ -172,7 +172,7 @@ def test_register_missing_phoneNumber():
         "email":random_email(),
         "password": "Pass123!",
         "address": "Somewhere",
-        "roles": ["customer"]
+        "roles": ["CUSTOMER"]
     }
     res = requests.post(BASE_URL, json=payload)
     assert res.status_code in (400, 422)

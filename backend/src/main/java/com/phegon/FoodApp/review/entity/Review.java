@@ -25,7 +25,7 @@ public class Review {
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
-    private User user; // Customer who wrote the review
+    private User user; // CUSTOMER who wrote the review
 
     private Integer rating; // e.g., 1 to 10 stars
 

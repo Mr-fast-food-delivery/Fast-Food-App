@@ -16,5 +16,5 @@ public interface OrderService {
     Response<List<OrderDTO>> getOrdersOfUser();
     Response<OrderItemDTO> getOrderItemById(Long orderItemId);
     Response<OrderDTO> updateOrderStatus(OrderDTO orderDTO);
-    Response<Long> countUniqueCustomers();
+    Response<Long> countUniqueCUSTOMERs();
 }
