@@ -1,5 +1,11 @@
 package com.phegon.FoodApp.payment.services;
 
+import com.phegon.FoodApp.order.dtos.OrderDTO;
+import com.phegon.FoodApp.order.dtos.OrderItemDTO;
+import com.phegon.FoodApp.menu.dtos.MenuDTO;
+import com.phegon.FoodApp.review.dtos.ReviewDTO;
+import com.phegon.FoodApp.auth_users.dtos.UserDTO;
+import com.phegon.FoodApp.payment.dtos.PaymentDTO;
 import com.phegon.FoodApp.auth_users.entity.User;
 import com.phegon.FoodApp.email_notification.dtos.NotificationDTO;
 import com.phegon.FoodApp.email_notification.services.NotificationService;
@@ -11,7 +17,6 @@ import com.phegon.FoodApp.exceptions.NotFoundException;
 import com.phegon.FoodApp.order.entity.Order;
 import com.phegon.FoodApp.order.entity.OrderItem;
 import com.phegon.FoodApp.order.repository.OrderRepository;
-import com.phegon.FoodApp.payment.dtos.PaymentDTO;
 import com.phegon.FoodApp.payment.entity.Payment;
 import com.phegon.FoodApp.payment.repository.PaymentRepository;
 import com.phegon.FoodApp.response.Response;
@@ -24,10 +29,14 @@ import org.modelmapper.ModelMapper;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 import org.springframework.data.domain.Sort;
+import java.lang.reflect.Field;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.lang.reflect.Type;
+import org.modelmapper.TypeToken;
+
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -205,10 +214,27 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    void testInitializePayment_StripeKeyNull() {
-        paymentService.initializePayment(null);
-        // Stripe.apiKey null → Runtime
+    void testInitializePayment_StripeKeyNull() throws Exception {
+
+        // stripe key null
+        Field f = PaymentServiceImpl.class.getDeclaredField("secreteKey");
+        f.setAccessible(true);
+        f.set(paymentService, null);
+
+        PaymentDTO req = new PaymentDTO();
+        req.setOrderId(1L);
+        req.setAmount(BigDecimal.valueOf(100));
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+
+        mockStatic(PaymentIntent.class)
+                .when(() -> PaymentIntent.create(any(PaymentIntentCreateParams.class)))
+                .thenThrow(new RuntimeException("Stripe key missing"));
+
+        assertThrows(RuntimeException.class,
+                () -> paymentService.initializePayment(req));
     }
+
 
     @Test
     void testInitializePayment_AmountZero() {
@@ -462,58 +488,81 @@ class PaymentServiceImplTest {
 
 
     // C. GET ALL PAYMENTS — 2 TEST
-
     @Test
     void testGetAllPayments_Success() {
+
+        // Mock payment list
         Payment p = new Payment();
-        p.setId(1L);
+        List<Payment> list = List.of(p);
 
-        when(paymentRepository.findAll(any(Sort.class)))
-                .thenReturn(List.of(p));
+        when(paymentRepository.findAll(any(Sort.class))).thenReturn(list);
 
+        // Mock DTO output
         PaymentDTO dto = new PaymentDTO();
-        when(modelMapper.map(any(), any())).thenReturn(List.of(dto));
+        dto.setOrder(new OrderDTO());
+        dto.setUser(new UserDTO());
 
+        // ModelMapper mock
+        Type expectedType = new TypeToken<List<PaymentDTO>>() {}.getType();
+
+        when(modelMapper.map(eq(list), eq(expectedType)))
+                .thenReturn(List.of(dto));
+
+        // Call service
         Response<List<PaymentDTO>> res = paymentService.getAllPayments();
 
-        assertEquals(200, res.getStatusCode());
+        // Assertions
         assertNotNull(res.getData());
+        assertEquals(1, res.getData().size());
+        assertNull(res.getData().get(0).getOrder());
+        assertNull(res.getData().get(0).getUser());
     }
+
 
     @Test
     void testGetAllPayments_Empty() {
-        when(paymentRepository.findAll(any(Sort.class)))
-                .thenReturn(Collections.emptyList());
+        when(paymentRepository.findAll(any(Sort.class))).thenReturn(List.of());
 
-        when(modelMapper.map(any(), any())).thenReturn(Collections.emptyList());
+        when(modelMapper.map(any(), any(Type.class)))
+                .thenReturn(List.of());
 
         Response<List<PaymentDTO>> res = paymentService.getAllPayments();
 
-        assertEquals(200, res.getStatusCode());
-        assertTrue(res.getData().isEmpty());
+        assertNotNull(res.getData());
+        assertEquals(0, res.getData().size());
     }
-
 
     // D. GET PAYMENT BY ID — 6 TEST
 
     @Test
     void testGetPaymentById_Success() {
-        Payment payment = new Payment();
-        payment.setId(1L);
-        payment.setUser(mockOrderWithUser().getUser());
-        payment.setOrder(mockOrderWithUser());
+        Payment p = new Payment();
+        p.setOrder(new Order());
+        p.setUser(new User());
+
+        OrderItemDTO itemDTO = new OrderItemDTO();
+        MenuDTO menuDTO = new MenuDTO();
+        menuDTO.setReviews(List.of(new ReviewDTO()));
+        itemDTO.setMenu(menuDTO);
+
+        OrderDTO orderDTO = new OrderDTO();
+        orderDTO.setOrderItems(List.of(itemDTO));
 
         PaymentDTO dto = new PaymentDTO();
-        dto.setUser(new com.phegon.FoodApp.auth_users.dtos.UserDTO());
-        dto.setOrder(new com.phegon.FoodApp.order.dtos.OrderDTO());
+        dto.setOrder(orderDTO);
+        dto.setUser(new UserDTO());
 
-        when(paymentRepository.findById(1L)).thenReturn(Optional.of(payment));
-        when(modelMapper.map(any(), eq(PaymentDTO.class))).thenReturn(dto);
+        when(paymentRepository.findById(1L)).thenReturn(Optional.of(p));
+        when(modelMapper.map(any(Payment.class), eq(PaymentDTO.class)))
+                .thenReturn(dto);
 
         Response<PaymentDTO> res = paymentService.getPaymentById(1L);
 
-        assertEquals(200, res.getStatusCode());
+        assertNull(res.getData().getUser().getRoles());
+        assertNull(res.getData().getOrder().getUser());
+        assertNull(res.getData().getOrder().getOrderItems().get(0).getMenu().getReviews());
     }
+
 
     @Test
     void testGetPaymentById_NotFound() {
