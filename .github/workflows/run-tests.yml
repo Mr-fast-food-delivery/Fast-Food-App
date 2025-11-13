@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - main
-      - auth_testing
+      - test_auth
   pull_request:
     branches:
       - main
-      - auth_testing
+      - test_auth
   workflow_dispatch:
 
 jobs:
