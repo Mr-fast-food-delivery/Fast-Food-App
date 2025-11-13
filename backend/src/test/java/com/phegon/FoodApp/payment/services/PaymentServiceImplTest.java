@@ -250,4 +250,213 @@ class PaymentServiceImplTest {
                     () -> paymentService.initializePayment(req));
         }
     }
+
+    //===========UPDATE PAYMENT FOR ORDER==========//
+    @Test
+    void testUpdatePayment_Success() {
+
+        PaymentDTO dto = new PaymentDTO();
+        dto.setOrderId(1L);
+        dto.setAmount(BigDecimal.valueOf(100));
+        dto.setSuccess(true);
+        dto.setTransactionId("tx123");
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(paymentRepository.save(any())).thenReturn(new Payment());
+        when(orderRepository.save(any())).thenReturn(mockOrder);
+        when(templateEngine.process(eq("payment-success"), any())).thenReturn("<html>OK</html>");
+
+        assertDoesNotThrow(() -> paymentService.updatePaymentForOrder(dto));
+
+        assertEquals(PaymentStatus.COMPLETED, mockOrder.getPaymentStatus());
+        assertEquals(OrderStatus.CONFIRMED, mockOrder.getOrderStatus());
+    }
+
+    @Test
+    void testUpdatePayment_Failed() {
+
+        PaymentDTO dto = new PaymentDTO();
+        dto.setOrderId(1L);
+        dto.setSuccess(false);
+        dto.setFailureReason("Card declined");
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(paymentRepository.save(any())).thenReturn(new Payment());
+        when(orderRepository.save(any())).thenReturn(mockOrder);
+        when(templateEngine.process(eq("payment-failed"), any())).thenReturn("<html>FAIL</html>");
+
+        assertDoesNotThrow(() -> paymentService.updatePaymentForOrder(dto));
+
+        assertEquals(PaymentStatus.FAILED, mockOrder.getPaymentStatus());
+        assertEquals(OrderStatus.CANCELLED, mockOrder.getOrderStatus());
+    }
+
+    @Test
+    void testUpdatePayment_OrderNotFound() {
+
+        PaymentDTO dto = new PaymentDTO();
+        dto.setOrderId(999L);
+
+        when(orderRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class,
+                () -> paymentService.updatePaymentForOrder(dto));
+    }
+
+    @Test
+    void testUpdatePayment_SavePaymentThrows() {
+
+        PaymentDTO dto = new PaymentDTO();
+        dto.setOrderId(1L);
+        dto.setSuccess(true);
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(paymentRepository.save(any())).thenThrow(new RuntimeException("DB Error"));
+
+        assertThrows(RuntimeException.class,
+                () -> paymentService.updatePaymentForOrder(dto));
+    }
+
+    @Test
+    void testUpdatePayment_SaveOrderThrows() {
+
+        PaymentDTO dto = new PaymentDTO();
+        dto.setOrderId(1L);
+        dto.setSuccess(true);
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(paymentRepository.save(any())).thenReturn(new Payment());
+        when(orderRepository.save(any())).thenThrow(new RuntimeException("Save error"));
+
+        assertThrows(RuntimeException.class,
+                () -> paymentService.updatePaymentForOrder(dto));
+    }
+
+    @Test
+    void testUpdatePayment_TemplateError_Success() {
+
+        PaymentDTO dto = new PaymentDTO();
+        dto.setOrderId(1L);
+        dto.setSuccess(true);
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(paymentRepository.save(any())).thenReturn(new Payment());
+        when(orderRepository.save(any())).thenReturn(mockOrder);
+
+        when(templateEngine.process(eq("payment-success"), any()))
+                .thenThrow(new RuntimeException("Template error"));
+
+        assertThrows(RuntimeException.class,
+                () -> paymentService.updatePaymentForOrder(dto));
+    }
+
+    @Test
+    void testUpdatePayment_EmailFailed_Success() {
+
+        PaymentDTO dto = new PaymentDTO();
+        dto.setOrderId(1L);
+        dto.setSuccess(true);
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(paymentRepository.save(any())).thenReturn(new Payment());
+        when(orderRepository.save(any())).thenReturn(mockOrder);
+        when(templateEngine.process(eq("payment-success"), any())).thenReturn("<html>Ok</html>");
+
+        doThrow(new RuntimeException("Email failed"))
+                .when(notificationService).sendEmail(any());
+
+        assertThrows(RuntimeException.class,
+                () -> paymentService.updatePaymentForOrder(dto));
+    }
+
+    @Test
+    void testUpdatePayment_EmailFailed_Failed() {
+
+        PaymentDTO dto = new PaymentDTO();
+        dto.setOrderId(1L);
+        dto.setSuccess(false);
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(paymentRepository.save(any())).thenReturn(new Payment());
+        when(orderRepository.save(any())).thenReturn(mockOrder);
+        when(templateEngine.process(eq("payment-failed"), any())).thenReturn("<html>Fail</html>");
+
+        doThrow(new RuntimeException("Email error"))
+                .when(notificationService).sendEmail(any());
+
+        assertThrows(RuntimeException.class,
+                () -> paymentService.updatePaymentForOrder(dto));
+    }
+
+    @Test
+    void testUpdatePayment_Failed_NoFailureReason() {
+
+        PaymentDTO dto = new PaymentDTO();
+        dto.setOrderId(1L);
+        dto.setSuccess(false);
+        dto.setFailureReason(null);
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(paymentRepository.save(any())).thenReturn(new Payment());
+        when(orderRepository.save(any())).thenReturn(mockOrder);
+        when(templateEngine.process(eq("payment-failed"), any())).thenReturn("<html></html>");
+
+        assertDoesNotThrow(() -> paymentService.updatePaymentForOrder(dto));
+    }
+
+    @Test
+    void testUpdatePayment_AmountNull() {
+
+        PaymentDTO dto = new PaymentDTO();
+        dto.setOrderId(1L);
+        dto.setAmount(null);
+        dto.setSuccess(true);
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(paymentRepository.save(any())).thenReturn(new Payment());
+        when(orderRepository.save(any())).thenReturn(mockOrder);
+        when(templateEngine.process(eq("payment-success"), any())).thenReturn("<html></html>");
+
+        assertDoesNotThrow(() -> paymentService.updatePaymentForOrder(dto));
+    }
+
+    @Test
+    void testUpdatePayment_TransactionIdNull() {
+
+        PaymentDTO dto = new PaymentDTO();
+        dto.setOrderId(1L);
+        dto.setTransactionId(null);
+        dto.setSuccess(true);
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+        when(paymentRepository.save(any())).thenReturn(new Payment());
+        when(orderRepository.save(any())).thenReturn(mockOrder);
+        when(templateEngine.process(eq("payment-success"), any())).thenReturn("<html></html>");
+
+        assertDoesNotThrow(() -> paymentService.updatePaymentForOrder(dto));
+    }
+
+    @Test
+    void testUpdatePayment_PaymentDateSet() {
+
+        PaymentDTO dto = new PaymentDTO();
+        dto.setOrderId(1L);
+        dto.setSuccess(true);
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
+
+        ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
+
+        when(paymentRepository.save(any())).thenAnswer(inv -> {
+            Payment p = inv.getArgument(0);
+            assertNotNull(p.getPaymentDate());
+            return p;
+        });
+
+        when(orderRepository.save(any())).thenReturn(mockOrder);
+        when(templateEngine.process(anyString(), any())).thenReturn("<html></html>");
+
+        assertDoesNotThrow(() -> paymentService.updatePaymentForOrder(dto));
+    }
+
 }

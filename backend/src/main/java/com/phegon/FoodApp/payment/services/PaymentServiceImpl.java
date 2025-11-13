@@ -88,6 +88,10 @@ public class PaymentServiceImpl implements PaymentService {
 
         log.info("Payment amount tally...moving");
 
+        if (order.getTotalAmount().compareTo(BigDecimal.ZERO) == 0) {
+            throw new BadRequestException("Total amount cannot be zero");
+        }
+
         //create payment intent i.e create unique transaction id for that payment
         try {
             PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
