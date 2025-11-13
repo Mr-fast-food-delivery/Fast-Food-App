@@ -67,25 +67,27 @@ class MenuServiceImplTest {
                 .build();
     }
 
-    MultipartFile mockFile() {
-        MultipartFile f = mock(MultipartFile.class);
-        when(f.isEmpty()).thenReturn(false);
-        when(f.getOriginalFilename()).thenReturn("photo.png");
+    MultipartFile mockFile_NoStrict() {
+        MultipartFile f = mock(MultipartFile.class, RETURNS_DEEP_STUBS);
+        lenient().when(f.isEmpty()).thenReturn(false);
+        lenient().when(f.getOriginalFilename()).thenReturn("original.png");
         return f;
     }
+    
     @Nested
+    @DisplayName("CREATE MENU TESTS")
     class CreateMenuTests {
 
         @Test
-        void createMenu_Success() {
+        void createMenu_Success() throws Exception {
             MenuDTO dto = mockMenuDTO();
-            dto.setImageFile(mockFile());
+            dto.setImageFile(mockFile_NoStrict());
 
-            when(categoryRepository.findById(1L)).thenReturn(Optional.of(mockCategory()));
-            try {
-                when(awss3Service.uploadFile(any(), any()))
-                        .thenReturn(new URL("https://s3.com/new.png"));
-            } catch (Exception ignored) {}
+            when(categoryRepository.findById(1L))
+                    .thenReturn(Optional.of(mockCategory()));
+
+            when(awss3Service.uploadFile(anyString(), any()))
+                    .thenReturn(new URL("https://s3.com/ok.png"));
 
             Menu saved = mockMenu();
             when(menuRepository.save(any())).thenReturn(saved);
@@ -93,91 +95,126 @@ class MenuServiceImplTest {
             when(modelMapper.map(saved, MenuDTO.class)).thenReturn(dto);
 
             Response<MenuDTO> res = menuService.createMenu(dto);
+
             assertEquals(200, res.getStatusCode());
+            assertNotNull(res.getData());
         }
 
         @Test
         void createMenu_CategoryNotFound() {
             MenuDTO dto = mockMenuDTO();
-            dto.setImageFile(mockFile());
+            dto.setImageFile(mockFile_NoStrict());
 
             when(categoryRepository.findById(1L)).thenReturn(Optional.empty());
-            assertThrows(NotFoundException.class, () -> menuService.createMenu(dto));
+
+            assertThrows(NotFoundException.class,
+                    () -> menuService.createMenu(dto));
         }
 
         @Test
         void createMenu_ImageNull() {
             MenuDTO dto = mockMenuDTO();
             dto.setImageFile(null);
+
             when(categoryRepository.findById(1L)).thenReturn(Optional.of(mockCategory()));
-            assertThrows(BadRequestException.class, () -> menuService.createMenu(dto));
+
+            assertThrows(BadRequestException.class,
+                    () -> menuService.createMenu(dto));
         }
 
         @Test
         void createMenu_ImageEmpty() {
             MenuDTO dto = mockMenuDTO();
-            MultipartFile f = mock(MultipartFile.class);
-            when(f.isEmpty()).thenReturn(true);
-            dto.setImageFile(f);
+
+            MultipartFile file = mock(MultipartFile.class);
+            lenient().when(file.isEmpty()).thenReturn(true);
+            dto.setImageFile(file);
 
             when(categoryRepository.findById(1L)).thenReturn(Optional.of(mockCategory()));
-            assertThrows(BadRequestException.class, () -> menuService.createMenu(dto));
+
+            assertThrows(BadRequestException.class,
+                    () -> menuService.createMenu(dto));
         }
 
         @Test
         void createMenu_UploadFails() throws Exception {
             MenuDTO dto = mockMenuDTO();
-            dto.setImageFile(mockFile());
+            dto.setImageFile(mockFile_NoStrict());
 
-            when(categoryRepository.findById(1L)).thenReturn(Optional.of(mockCategory()));
-            when(awss3Service.uploadFile(any(), any())).thenThrow(new RuntimeException());
+            when(categoryRepository.findById(1L))
+                    .thenReturn(Optional.of(mockCategory()));
 
-            assertThrows(RuntimeException.class, () -> menuService.createMenu(dto));
+            when(awss3Service.uploadFile(anyString(), any()))
+                    .thenThrow(new RuntimeException("upload failed"));
+
+            assertThrows(RuntimeException.class,
+                    () -> menuService.createMenu(dto));
         }
 
         @Test
         void createMenu_SaveFails() throws Exception {
             MenuDTO dto = mockMenuDTO();
-            dto.setImageFile(mockFile());
+            dto.setImageFile(mockFile_NoStrict());
 
-            when(categoryRepository.findById(1L)).thenReturn(Optional.of(mockCategory()));
-            when(awss3Service.uploadFile(any(), any())).thenReturn(new URL("https://s3.com/x.png"));
-            when(menuRepository.save(any())).thenThrow(new RuntimeException());
+            when(categoryRepository.findById(1L))
+                    .thenReturn(Optional.of(mockCategory()));
 
-            assertThrows(RuntimeException.class, () -> menuService.createMenu(dto));
+            when(awss3Service.uploadFile(anyString(), any()))
+                    .thenReturn(new URL("https://s3.com/a.png"));
+
+            when(menuRepository.save(any()))
+                    .thenThrow(new RuntimeException("db error"));
+
+            assertThrows(RuntimeException.class,
+                    () -> menuService.createMenu(dto));
         }
 
         @Test
         void createMenu_ModelMapperFails() throws Exception {
             MenuDTO dto = mockMenuDTO();
-            dto.setImageFile(mockFile());
+            dto.setImageFile(mockFile_NoStrict());
 
-            when(categoryRepository.findById(1L)).thenReturn(Optional.of(mockCategory()));
-            when(awss3Service.uploadFile(any(), any())).thenReturn(new URL("https://s3.com/x.png"));
-            when(menuRepository.save(any())).thenReturn(mockMenu());
-            when(modelMapper.map(any(), eq(MenuDTO.class))).thenThrow(new RuntimeException());
+            when(categoryRepository.findById(1L))
+                    .thenReturn(Optional.of(mockCategory()));
 
-            assertThrows(RuntimeException.class, () -> menuService.createMenu(dto));
+            when(awss3Service.uploadFile(anyString(), any()))
+                    .thenReturn(new URL("https://s3.com/a.png"));
+
+            when(menuRepository.save(any()))
+                    .thenReturn(mockMenu());
+
+            when(modelMapper.map(any(), eq(MenuDTO.class)))
+                    .thenThrow(new RuntimeException("mapper error"));
+
+            assertThrows(RuntimeException.class,
+                    () -> menuService.createMenu(dto));
         }
 
         @Test
         void createMenu_ImageNamePattern() throws Exception {
             MenuDTO dto = mockMenuDTO();
-            dto.setImageFile(mockFile());
+            dto.setImageFile(mockFile_NoStrict());
 
-            when(categoryRepository.findById(1L)).thenReturn(Optional.of(mockCategory()));
-            when(awss3Service.uploadFile(any(), any()))
-                    .thenReturn(new URL("https://s3.com/UUID_photo.png"));
+            when(categoryRepository.findById(1L))
+                    .thenReturn(Optional.of(mockCategory()));
 
-            when(menuRepository.save(any())).thenReturn(mockMenu());
-            when(modelMapper.map(any(), eq(MenuDTO.class))).thenReturn(dto);
+            when(awss3Service.uploadFile(anyString(), any()))
+                    .thenReturn(new URL("https://s3.com/UUID_original.png"));
+
+            when(menuRepository.save(any()))
+                    .thenReturn(mockMenu());
+
+            when(modelMapper.map(any(), eq(MenuDTO.class)))
+                    .thenReturn(dto);
 
             Response<MenuDTO> res = menuService.createMenu(dto);
+
             assertEquals(200, res.getStatusCode());
         }
     }
 
-        @Nested
+    @Nested
+    @DisplayName("UPDATE MENU TESTS")
     class UpdateMenuTests {
 
         Menu existingWithImage() {
@@ -192,8 +229,11 @@ class MenuServiceImplTest {
             dto.setId(10L);
             dto.setImageFile(null);
 
-            when(menuRepository.findById(10L)).thenReturn(Optional.of(existingWithImage()));
-            when(categoryRepository.findById(1L)).thenReturn(Optional.of(mockCategory()));
+            when(menuRepository.findById(10L))
+                    .thenReturn(Optional.of(existingWithImage()));
+
+            when(categoryRepository.findById(1L))
+                    .thenReturn(Optional.of(mockCategory()));
 
             Menu updated = existingWithImage();
             when(menuRepository.save(any())).thenReturn(updated);
@@ -210,36 +250,46 @@ class MenuServiceImplTest {
         void updateMenu_Success_WithImageChange() throws Exception {
             MenuDTO dto = mockMenuDTO();
             dto.setId(10L);
-            dto.setImageFile(mockFile());
+            dto.setImageFile(mockFile_NoStrict());
 
-            when(menuRepository.findById(10L)).thenReturn(Optional.of(existingWithImage()));
-            when(categoryRepository.findById(1L)).thenReturn(Optional.of(mockCategory()));
+            when(menuRepository.findById(10L))
+                    .thenReturn(Optional.of(existingWithImage()));
+
+            when(categoryRepository.findById(1L))
+                    .thenReturn(Optional.of(mockCategory()));
 
             when(awss3Service.uploadFile(anyString(), any()))
                     .thenReturn(new URL("https://s3.com/new.png"));
 
             Menu updated = existingWithImage();
             updated.setImageUrl("https://s3.com/new.png");
+
             when(menuRepository.save(any())).thenReturn(updated);
-            when(modelMapper.map(updated, MenuDTO.class)).thenReturn(dto);
+
+            when(modelMapper.map(updated, MenuDTO.class))
+                    .thenReturn(dto);
 
             Response<MenuDTO> res = menuService.updateMenu(dto);
 
             assertEquals(200, res.getStatusCode());
-            // old image bị xóa
+
+            // old image must be deleted
             verify(awss3Service).deleteFile("menus/old.png");
-            // ảnh mới upload
+
+            // new file must be uploaded
             verify(awss3Service).uploadFile(startsWith("menus/"), any());
         }
 
         @Test
         void updateMenu_MenuNotFound() {
             MenuDTO dto = mockMenuDTO();
-            dto.setId(99L);
+            dto.setId(999L);
 
-            when(menuRepository.findById(99L)).thenReturn(Optional.empty());
+            when(menuRepository.findById(999L))
+                    .thenReturn(Optional.empty());
 
-            assertThrows(NotFoundException.class, () -> menuService.updateMenu(dto));
+            assertThrows(NotFoundException.class,
+                    () -> menuService.updateMenu(dto));
         }
 
         @Test
@@ -247,28 +297,38 @@ class MenuServiceImplTest {
             MenuDTO dto = mockMenuDTO();
             dto.setId(10L);
 
-            when(menuRepository.findById(10L)).thenReturn(Optional.of(existingWithImage()));
-            when(categoryRepository.findById(1L)).thenReturn(Optional.empty());
+            when(menuRepository.findById(10L))
+                    .thenReturn(Optional.of(existingWithImage()));
 
-            assertThrows(NotFoundException.class, () -> menuService.updateMenu(dto));
+            when(categoryRepository.findById(1L))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(NotFoundException.class,
+                    () -> menuService.updateMenu(dto));
         }
 
         @Test
         void updateMenu_OldImageNull_NoDelete() throws Exception {
             MenuDTO dto = mockMenuDTO();
             dto.setId(10L);
-            dto.setImageFile(mockFile());
+            dto.setImageFile(mockFile_NoStrict());
 
             Menu menuNoImage = mockMenu();
             menuNoImage.setImageUrl(null);
 
-            when(menuRepository.findById(10L)).thenReturn(Optional.of(menuNoImage));
-            when(categoryRepository.findById(1L)).thenReturn(Optional.of(mockCategory()));
+            when(menuRepository.findById(10L))
+                    .thenReturn(Optional.of(menuNoImage));
+
+            when(categoryRepository.findById(1L))
+                    .thenReturn(Optional.of(mockCategory()));
+
             when(awss3Service.uploadFile(anyString(), any()))
                     .thenReturn(new URL("https://s3.com/new.png"));
 
             when(menuRepository.save(any())).thenReturn(menuNoImage);
-            when(modelMapper.map(any(), eq(MenuDTO.class))).thenReturn(dto);
+
+            when(modelMapper.map(any(), eq(MenuDTO.class)))
+                    .thenReturn(dto);
 
             menuService.updateMenu(dto);
 
@@ -280,108 +340,149 @@ class MenuServiceImplTest {
         void updateMenu_UploadNewImageFails() throws Exception {
             MenuDTO dto = mockMenuDTO();
             dto.setId(10L);
-            dto.setImageFile(mockFile());
+            dto.setImageFile(mockFile_NoStrict());
 
-            when(menuRepository.findById(10L)).thenReturn(Optional.of(existingWithImage()));
-            when(categoryRepository.findById(1L)).thenReturn(Optional.of(mockCategory()));
+            when(menuRepository.findById(10L))
+                    .thenReturn(Optional.of(existingWithImage()));
+
+            when(categoryRepository.findById(1L))
+                    .thenReturn(Optional.of(mockCategory()));
 
             when(awss3Service.uploadFile(anyString(), any()))
                     .thenThrow(new RuntimeException("upload error"));
 
-            assertThrows(RuntimeException.class, () -> menuService.updateMenu(dto));
+            assertThrows(RuntimeException.class,
+                    () -> menuService.updateMenu(dto));
         }
 
         @Test
         void updateMenu_SaveFails() throws Exception {
             MenuDTO dto = mockMenuDTO();
             dto.setId(10L);
-            dto.setImageFile(mockFile());
+            dto.setImageFile(mockFile_NoStrict());
 
-            when(menuRepository.findById(10L)).thenReturn(Optional.of(existingWithImage()));
-            when(categoryRepository.findById(1L)).thenReturn(Optional.of(mockCategory()));
+            when(menuRepository.findById(10L))
+                    .thenReturn(Optional.of(existingWithImage()));
+
+            when(categoryRepository.findById(1L))
+                    .thenReturn(Optional.of(mockCategory()));
+
             when(awss3Service.uploadFile(anyString(), any()))
                     .thenReturn(new URL("https://s3.com/new.png"));
-            when(menuRepository.save(any())).thenThrow(new RuntimeException("db error"));
 
-            assertThrows(RuntimeException.class, () -> menuService.updateMenu(dto));
+            when(menuRepository.save(any()))
+                    .thenThrow(new RuntimeException("db error"));
+
+            assertThrows(RuntimeException.class,
+                    () -> menuService.updateMenu(dto));
         }
 
         @Test
         void updateMenu_ModelMapperFails() throws Exception {
             MenuDTO dto = mockMenuDTO();
             dto.setId(10L);
-            dto.setImageFile(mockFile());
+            dto.setImageFile(mockFile_NoStrict());
 
-            when(menuRepository.findById(10L)).thenReturn(Optional.of(existingWithImage()));
-            when(categoryRepository.findById(1L)).thenReturn(Optional.of(mockCategory()));
+            when(menuRepository.findById(10L))
+                    .thenReturn(Optional.of(existingWithImage()));
+
+            when(categoryRepository.findById(1L))
+                    .thenReturn(Optional.of(mockCategory()));
+
             when(awss3Service.uploadFile(anyString(), any()))
                     .thenReturn(new URL("https://s3.com/new.png"));
-            when(menuRepository.save(any())).thenReturn(existingWithImage());
-            when(modelMapper.map(any(), eq(MenuDTO.class))).thenThrow(new RuntimeException());
 
-            assertThrows(RuntimeException.class, () -> menuService.updateMenu(dto));
+            when(menuRepository.save(any()))
+                    .thenReturn(existingWithImage());
+
+            when(modelMapper.map(any(), eq(MenuDTO.class)))
+                    .thenThrow(new RuntimeException("mapper error"));
+
+            assertThrows(RuntimeException.class,
+                    () -> menuService.updateMenu(dto));
         }
 
         @Test
         void updateMenu_FieldMappingCorrect() {
             MenuDTO dto = mockMenuDTO();
             dto.setId(10L);
-            dto.setName("New name");
-            dto.setDescription("New desc");
-            dto.setPrice(BigDecimal.valueOf(123));
+            dto.setName("New Name");
+            dto.setDescription("New Desc");
+            dto.setPrice(BigDecimal.valueOf(222));
             dto.setImageFile(null);
 
             Menu existing = existingWithImage();
 
-            when(menuRepository.findById(10L)).thenReturn(Optional.of(existing));
-            when(categoryRepository.findById(1L)).thenReturn(Optional.of(mockCategory()));
+            when(menuRepository.findById(10L))
+                    .thenReturn(Optional.of(existing));
+
+            when(categoryRepository.findById(1L))
+                    .thenReturn(Optional.of(mockCategory()));
 
             ArgumentCaptor<Menu> captor = ArgumentCaptor.forClass(Menu.class);
-            when(menuRepository.save(captor.capture())).thenReturn(existing);
-            when(modelMapper.map(any(), eq(MenuDTO.class))).thenReturn(dto);
+
+            when(menuRepository.save(captor.capture()))
+                    .thenReturn(existing);
+
+            when(modelMapper.map(any(), eq(MenuDTO.class)))
+                    .thenReturn(dto);
 
             menuService.updateMenu(dto);
 
             Menu saved = captor.getValue();
-            assertEquals("New name", saved.getName());
-            assertEquals("New desc", saved.getDescription());
-            assertEquals(BigDecimal.valueOf(123), saved.getPrice());
+            assertEquals("New Name", saved.getName());
+            assertEquals("New Desc", saved.getDescription());
+            assertEquals(BigDecimal.valueOf(222), saved.getPrice());
         }
 
         @Test
         void updateMenu_ImageNamePattern() throws Exception {
             MenuDTO dto = mockMenuDTO();
             dto.setId(10L);
-            dto.setImageFile(mockFile());
+            dto.setImageFile(mockFile_NoStrict());
 
-            when(menuRepository.findById(10L)).thenReturn(Optional.of(existingWithImage()));
-            when(categoryRepository.findById(1L)).thenReturn(Optional.of(mockCategory()));
+            when(menuRepository.findById(10L))
+                    .thenReturn(Optional.of(existingWithImage()));
+
+            when(categoryRepository.findById(1L))
+                    .thenReturn(Optional.of(mockCategory()));
 
             when(awss3Service.uploadFile(anyString(), any()))
                     .thenReturn(new URL("https://s3.com/new.png"));
-            when(menuRepository.save(any())).thenReturn(existingWithImage());
-            when(modelMapper.map(any(), eq(MenuDTO.class))).thenReturn(dto);
+
+            when(menuRepository.save(any()))
+                    .thenReturn(existingWithImage());
+
+            when(modelMapper.map(any(), eq(MenuDTO.class)))
+                    .thenReturn(dto);
 
             menuService.updateMenu(dto);
 
-            ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
-            verify(awss3Service).uploadFile(keyCaptor.capture(), any());
-            String key = keyCaptor.getValue();
+            ArgumentCaptor<String> keyCap = ArgumentCaptor.forClass(String.class);
+            verify(awss3Service).uploadFile(keyCap.capture(), any());
+
+            String key = keyCap.getValue();
             assertTrue(key.startsWith("menus/"));
             assertTrue(key.contains("_"));
         }
     }
+
     @Nested
+    @DisplayName("GET MENU BY ID TESTS")
     class GetMenuByIdTests {
 
         @Test
         void getMenuById_Success() {
             Menu menu = mockMenu();
+
             MenuDTO dto = mockMenuDTO();
             dto.setId(10L);
 
-            when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
-            when(modelMapper.map(menu, MenuDTO.class)).thenReturn(dto);
+            when(menuRepository.findById(10L))
+                    .thenReturn(Optional.of(menu));
+
+            when(modelMapper.map(menu, MenuDTO.class))
+                    .thenReturn(dto);
 
             Response<MenuDTO> res = menuService.getMenuById(10L);
 
@@ -391,80 +492,116 @@ class MenuServiceImplTest {
 
         @Test
         void getMenuById_NotFound() {
-            when(menuRepository.findById(10L)).thenReturn(Optional.empty());
-            assertThrows(NotFoundException.class, () -> menuService.getMenuById(10L));
+            when(menuRepository.findById(10L))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(NotFoundException.class,
+                    () -> menuService.getMenuById(10L));
         }
 
         @Test
         void getMenuById_ModelMapperFails() {
             Menu menu = mockMenu();
 
-            when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
-            when(modelMapper.map(any(), eq(MenuDTO.class))).thenThrow(new RuntimeException());
+            when(menuRepository.findById(10L))
+                    .thenReturn(Optional.of(menu));
 
-            assertThrows(RuntimeException.class, () -> menuService.getMenuById(10L));
+            when(modelMapper.map(menu, MenuDTO.class))
+                    .thenThrow(new RuntimeException("Mapper error"));
+
+            assertThrows(RuntimeException.class,
+                    () -> menuService.getMenuById(10L));
         }
 
         @Test
         void getMenuById_ReviewSortDesc() {
+
             Menu menu = mockMenu();
 
             ReviewDTO r1 = new ReviewDTO(); r1.setId(1L);
-            ReviewDTO r2 = new ReviewDTO(); r2.setId(3L);
-            ReviewDTO r3 = new ReviewDTO(); r3.setId(2L);
+            ReviewDTO r2 = new ReviewDTO(); r2.setId(5L);
+            ReviewDTO r3 = new ReviewDTO(); r3.setId(3L);
+
             List<ReviewDTO> reviews = new ArrayList<>(List.of(r1, r2, r3));
 
             MenuDTO dto = mockMenuDTO();
             dto.setReviews(reviews);
 
-            when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
-            when(modelMapper.map(menu, MenuDTO.class)).thenReturn(dto);
+            when(menuRepository.findById(10L))
+                    .thenReturn(Optional.of(menu));
+
+            when(modelMapper.map(menu, MenuDTO.class))
+                    .thenReturn(dto);
 
             Response<MenuDTO> res = menuService.getMenuById(10L);
 
             List<ReviewDTO> sorted = res.getData().getReviews();
-            assertEquals(3L, sorted.get(0).getId());
-            assertEquals(2L, sorted.get(1).getId());
+
+            assertEquals(5L, sorted.get(0).getId());
+            assertEquals(3L, sorted.get(1).getId());
             assertEquals(1L, sorted.get(2).getId());
         }
 
         @Test
         void getMenuById_ReviewNullList() {
             Menu menu = mockMenu();
+
             MenuDTO dto = mockMenuDTO();
             dto.setReviews(null);
 
-            when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
-            when(modelMapper.map(menu, MenuDTO.class)).thenReturn(dto);
+            when(menuRepository.findById(10L))
+                    .thenReturn(Optional.of(menu));
 
+            when(modelMapper.map(menu, MenuDTO.class))
+                    .thenReturn(dto);
+
+            // Must not throw
             assertDoesNotThrow(() -> menuService.getMenuById(10L));
         }
     }
+
     @Nested
+    @DisplayName("DELETE MENU TESTS")
     class DeleteMenuTests {
 
         @Test
         void deleteMenu_Success_WithImage() {
+
             Menu menu = mockMenu();
             menu.setId(10L);
             menu.setImageUrl("https://s3.com/a.png");
 
-            when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
+            when(menuRepository.findById(10L))
+                    .thenReturn(Optional.of(menu));
+
+            // deleteFile không return gì → dùng doNothing
+            doNothing().when(awss3Service)
+                    .deleteFile("menus/a.png");
+
+            // deleteById cũng không trả về
+            doNothing().when(menuRepository)
+                    .deleteById(10L);
 
             Response<?> res = menuService.deleteMenu(10L);
 
             assertEquals(200, res.getStatusCode());
+
             verify(awss3Service).deleteFile("menus/a.png");
             verify(menuRepository).deleteById(10L);
         }
 
+
         @Test
         void deleteMenu_Success_NoImage() {
+
             Menu menu = mockMenu();
             menu.setId(10L);
             menu.setImageUrl(null);
 
-            when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
+            when(menuRepository.findById(10L))
+                    .thenReturn(Optional.of(menu));
+
+            doNothing().when(menuRepository).deleteById(10L);
 
             menuService.deleteMenu(10L);
 
@@ -472,40 +609,62 @@ class MenuServiceImplTest {
             verify(menuRepository).deleteById(10L);
         }
 
+
         @Test
         void deleteMenu_NotFound() {
-            when(menuRepository.findById(10L)).thenReturn(Optional.empty());
-            assertThrows(NotFoundException.class, () -> menuService.deleteMenu(10L));
+
+            when(menuRepository.findById(10L))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(NotFoundException.class,
+                    () -> menuService.deleteMenu(10L));
         }
+
 
         @Test
         void deleteMenu_DeleteFileFails() {
+
             Menu menu = mockMenu();
             menu.setId(10L);
             menu.setImageUrl("https://s3.com/a.png");
 
-            when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
-            doThrow(new RuntimeException("s3 error"))
-                    .when(awss3Service).deleteFile(anyString());
+            when(menuRepository.findById(10L))
+                    .thenReturn(Optional.of(menu));
 
-            assertThrows(RuntimeException.class, () -> menuService.deleteMenu(10L));
+            doThrow(new RuntimeException("s3 error"))
+                    .when(awss3Service)
+                    .deleteFile("menus/a.png");
+
+            assertThrows(RuntimeException.class,
+                    () -> menuService.deleteMenu(10L));
         }
+
 
         @Test
         void deleteMenu_DeleteFails() {
+
             Menu menu = mockMenu();
             menu.setId(10L);
             menu.setImageUrl("https://s3.com/a.png");
 
-            when(menuRepository.findById(10L)).thenReturn(Optional.of(menu));
-            // deleteFile ok
-            doNothing().when(awss3Service).deleteFile(anyString());
-            doThrow(new RuntimeException("db error")).when(menuRepository).deleteById(10L);
+            when(menuRepository.findById(10L))
+                    .thenReturn(Optional.of(menu));
 
-            assertThrows(RuntimeException.class, () -> menuService.deleteMenu(10L));
+            // deleteFile OK
+            doNothing().when(awss3Service)
+                    .deleteFile("menus/a.png");
+
+            // deleteById lỗi
+            doThrow(new RuntimeException("db error"))
+                    .when(menuRepository)
+                    .deleteById(10L);
+
+            assertThrows(RuntimeException.class,
+                    () -> menuService.deleteMenu(10L));
         }
     }
-    @Nested
+
+@Nested
     class GetMenusTests {
 
         Menu menu1() {
