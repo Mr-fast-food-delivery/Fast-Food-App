@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.util.LinkedMultiValueMap;
@@ -362,7 +363,49 @@ public class UserIntegrationIT {
     }
 
     @Test @Order(19)
-    void INT006f_missingToken() {
+    void INT006f_imageFileEmpty() {
+        User u = createUser("imgempty@gmail.com");
+        String token = jwtUtils.generateToken(u.getEmail());
+
+        HttpHeaders h = authHeader(token);
+        h.setContentType(MediaType.MULTIPART_FORM_DATA);
+
+        // Giả lập file rỗng (empty)
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("imageFile", new ByteArrayResource(new byte[] {}) {
+            @Override
+            public String getFilename() {
+                return "empty.jpg";
+            }
+        });
+
+        ResponseEntity<String> res =
+                rest.exchange(url("/update"), HttpMethod.PUT,
+                        new HttpEntity<>(body, h), String.class);
+
+        Assertions.assertEquals(400, res.getStatusCodeValue());
+    }
+
+    @Test @Order(20)
+    void INT006g_nameEmpty() {
+        User u = createUser("nameempty@gmail.com");
+        String token = jwtUtils.generateToken(u.getEmail());
+
+        HttpHeaders h = authHeader(token);
+        h.setContentType(MediaType.MULTIPART_FORM_DATA);
+
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("name", "");   // name empty => phải fail
+
+        ResponseEntity<String> res =
+                rest.exchange(url("/update"), HttpMethod.PUT,
+                        new HttpEntity<>(body, h), String.class);
+
+        Assertions.assertEquals(400, res.getStatusCodeValue());
+    }
+
+    @Test @Order(21)
+    void INT006h_missingToken() {
         ResponseEntity<String> res =
                 rest.exchange(url("/update"), HttpMethod.PUT,
                         new HttpEntity<>(new HttpHeaders()), String.class);
@@ -375,7 +418,7 @@ public class UserIntegrationIT {
     // INT007 – DEACTIVATE
     // ============================================================
 
-    @Test @Order(20)
+    @Test @Order(22)
     void INT007a_deactivate_success() {
         User u = createUser("dec@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
@@ -387,7 +430,7 @@ public class UserIntegrationIT {
         Assertions.assertEquals(200, res.getStatusCodeValue());
     }
 
-    @Test @Order(21)
+    @Test @Order(23)
     void INT007b_missingToken() {
         ResponseEntity<String> res =
                 rest.exchange(url("/deactivate"), HttpMethod.DELETE,
@@ -396,7 +439,7 @@ public class UserIntegrationIT {
         Assertions.assertEquals(401, res.getStatusCodeValue());
     }
 
-    @Test @Order(22)
+    @Test @Order(24)
     void INT007c_expiredToken() {
         String expired = generateExpiredToken("user@gmail.com");
 
@@ -407,7 +450,7 @@ public class UserIntegrationIT {
         Assertions.assertEquals(401, res.getStatusCodeValue());
     }
 
-    @Test @Order(23)
+    @Test @Order(25)
     void INT007d_userNotFound() {
         User u = createUser("gone@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
@@ -421,7 +464,7 @@ public class UserIntegrationIT {
         Assertions.assertEquals(404, res.getStatusCodeValue());
     }
 
-    @Test @Order(24)
+    @Test @Order(26)
     void INT007e_alreadyInactive() {
         User u = createUser("already@gmail.com");
         u.setActive(false);
