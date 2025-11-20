@@ -66,18 +66,18 @@ public class OrderServiceImpl  implements OrderService{
 
         log.info("Inside placeOrderFromCart()");
 
-        User CUSTOMER = userService.getCurrentLoggedInUser();
+        User customer = userService.getCurrentLoggedInUser();
 
         log.info("user passed");
 
-        String deliveryAddress = CUSTOMER.getAddress();
+        String deliveryAddress = customer.getAddress();
 
         log.info("deliveryAddress passed");
 
         if (deliveryAddress == null) {
             throw new NotFoundException("Delivery Address Not present for the user");
         }
-        Cart cart = cartRepository.findByUser_Id(CUSTOMER.getId())
+        Cart cart = cartRepository.findByUser_Id(customer.getId())
                 .orElseThrow(()-> new NotFoundException("Cart not found for the user" ));
 
 
@@ -111,7 +111,7 @@ public class OrderServiceImpl  implements OrderService{
         log.info("orderItem adding passed");
 
         Order order = Order.builder()
-                .user(CUSTOMER)
+                .user(customer)
                 .orderItems(orderItems)
                 .orderDate(LocalDateTime.now())
                 .totalAmount(totalAmount)
@@ -145,7 +145,7 @@ public class OrderServiceImpl  implements OrderService{
         log.info("model mappern mapped savedOrder to OrderDTO");
 
         // Send email notifications
-        sendOrderConfirmationEmail(CUSTOMER, orderDTO);
+        sendOrderConfirmationEmail(customer, orderDTO);
 
 
         log.info("building response to send");
@@ -207,8 +207,8 @@ public class OrderServiceImpl  implements OrderService{
     public Response<List<OrderDTO>> getOrdersOfUser() {
         log.info("Inside getOrdersOfUser()");
 
-        User CUSTOMER = userService.getCurrentLoggedInUser();
-        List<Order> orders = orderRepository.findByUserOrderByOrderDateDesc(CUSTOMER);
+        User customer = userService.getCurrentLoggedInUser();
+        List<Order> orders = orderRepository.findByUserOrderByOrderDateDesc(customer);
 
         List<OrderDTO> orderDTOS = orders.stream()
                 .map(order -> modelMapper.map(order, OrderDTO.class))
@@ -270,27 +270,27 @@ public class OrderServiceImpl  implements OrderService{
     }
 
     @Override
-    public Response<Long> countUniqueCUSTOMERs() {
-        log.info("Inside countUniqueCUSTOMERs()");
+    public Response<Long> countUniqueCustomers() {
+        log.info("Inside countUniqueCustomers()");
 
-        long uniqueCUSTOMERCount = orderRepository.countDistinctUsers();
+        long uniqueCustomerCount = orderRepository.countDistinctUsers();
         return Response.<Long>builder()
                 .statusCode(HttpStatus.OK.value())
-                .message("Unique CUSTOMER count retrieved successfully")
-                .data(uniqueCUSTOMERCount)
+                .message("Unique customer count retrieved successfully")
+                .data(uniqueCustomerCount)
                 .build();
     }
 
 
 
-    private void sendOrderConfirmationEmail(User CUSTOMER, OrderDTO orderDTO){
+    private void sendOrderConfirmationEmail(User customer, OrderDTO orderDTO){
 
         String subject =  "Your Order Confirmation - Order #" + orderDTO.getId();
 
         //create a Thymeleaf contex and set variables. import the context from Thymeleaf
         Context context = new Context(Locale.getDefault());
 
-        context.setVariable("CUSTOMERName", CUSTOMER.getName());
+        context.setVariable("customerName", customer.getName());
         context.setVariable("orderId", String.valueOf(orderDTO.getId()));
         context.setVariable("orderDate", orderDTO.getOrderDate().toString());
         context.setVariable("totalAmount", orderDTO.getTotalAmount().toString());
@@ -322,7 +322,7 @@ public class OrderServiceImpl  implements OrderService{
             String emailBody = templateEngine.process("order-confirmation", context);  // "order-confirmation" is the template name
 
             notificationService.sendEmail(NotificationDTO.builder()
-                    .recipient(CUSTOMER.getEmail())
+                    .recipient(customer.getEmail())
                     .subject(subject)
                     .body(emailBody)
                     .isHtml(true)
