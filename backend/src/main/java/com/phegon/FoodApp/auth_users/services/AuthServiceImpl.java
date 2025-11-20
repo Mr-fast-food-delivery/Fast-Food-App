@@ -90,12 +90,12 @@ public class AuthServiceImpl implements AuthService{
 
         // Find the user by email
         User user = userRepository.findByEmail(loginRequest.getEmail())
-                .orElseThrow(() -> new BadRequestException("Invalid Email"));
+                .orElseThrow(() -> new NotFoundException("Invalid Email"));
 
         if (!user.isActive()) {
             throw new NotFoundException("Account not active, Please contact CUSTOMER support");
         }
-
+        
         if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
             throw new BadRequestException("Invalid Password");
         }
