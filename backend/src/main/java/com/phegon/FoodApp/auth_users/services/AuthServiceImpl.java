@@ -36,7 +36,9 @@ public class AuthServiceImpl implements AuthService{
     public Response<?> register(RegistrationRequest registrationRequest) {
 
         log.info("INSIDE register()");
-
+        
+        validateRegistrationRequest(registrationRequest);
+        
         // Validate the registration request
         if (userRepository.existsByEmail(registrationRequest.getEmail())) {
             throw new BadRequestException("Email already exists");
@@ -84,31 +86,26 @@ public class AuthServiceImpl implements AuthService{
     public Response<LoginResponse> login(LoginRequest loginRequest) {
 
         log.info("INSIDE login()");
+        validateLoginRequest(loginRequest); // ✅ thêm dòng này
 
         // Find the user by email
         User user = userRepository.findByEmail(loginRequest.getEmail())
                 .orElseThrow(() -> new BadRequestException("Invalid Email"));
 
         if (!user.isActive()) {
-            throw new NotFoundException("Account not active, Please contact customer support");
+            throw new NotFoundException("Account not active, Please contact CUSTOMER support");
         }
 
-        // Verify the password
         if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
             throw new BadRequestException("Invalid Password");
         }
 
-        // Generate a token
         String token = jwtUtils.generateToken(user.getEmail());
-
-        // Extract role names as a list
         List<String> roleNames = user.getRoles().stream()
                 .map(Role::getName)
                 .toList();
 
-
         LoginResponse loginResponse = new LoginResponse();
-
         loginResponse.setToken(token);
         loginResponse.setRoles(roleNames);
 
@@ -118,12 +115,36 @@ public class AuthServiceImpl implements AuthService{
                 .data(loginResponse)
                 .build();
     }
+
+    private void validateRegistrationRequest(RegistrationRequest req) {
+
+        if (req.getName() == null || req.getName().trim().isEmpty())
+            throw new BadRequestException("Name is required");
+
+        if (req.getEmail() == null)
+            throw new BadRequestException("Email is required");
+        if (!req.getEmail().matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$"))
+            throw new BadRequestException("Invalid email format");
+
+        if (req.getPassword() == null)
+            throw new BadRequestException("Password is required");
+        if (req.getPassword().length() < 6)
+            throw new BadRequestException("Password must be at least 6 characters long");
+
+        if (req.getPhoneNumber() == null)
+            throw new BadRequestException("Phone number is required");
+        if (!req.getPhoneNumber().matches("^[0-9]{10}$"))
+            throw new BadRequestException("Phone number must be 10 digits");
+    }
+
+    private void validateLoginRequest(LoginRequest req) {
+        if (req.getEmail() == null || req.getEmail().isBlank())
+            throw new BadRequestException("Email cannot be empty");
+        if (!req.getEmail().matches("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"))
+            throw new BadRequestException("Invalid email format");
+        if (req.getPassword() == null || req.getPassword().isBlank())
+            throw new BadRequestException("Password cannot be empty");
+        if (req.getPassword().length() < 6)
+            throw new BadRequestException("Password must be at least 6 characters long");
+    }
 }
-
-
-
-
-
-
-
-
