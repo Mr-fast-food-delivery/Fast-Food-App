@@ -64,7 +64,7 @@ public class OrderController {
     @GetMapping("/unique-CUSTOMERs")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Response<Long>> countUniqueCUSTOMERs() {
-        return ResponseEntity.ok(orderService.countUniqueCUSTOMERs());
+        return ResponseEntity.ok(orderService.countUniqueCustomers());
     }
 
 
