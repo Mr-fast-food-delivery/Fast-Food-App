@@ -4,7 +4,9 @@ package com.phegon.FoodApp.category.services;
 import com.phegon.FoodApp.category.dtos.CategoryDTO;
 import com.phegon.FoodApp.category.entity.Category;
 import com.phegon.FoodApp.category.repository.CategoryRepository;
+import com.phegon.FoodApp.exceptions.BadRequestException;
 import com.phegon.FoodApp.exceptions.NotFoundException;
+import com.phegon.FoodApp.menu.repository.MenuRepository;
 import com.phegon.FoodApp.response.Response;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,7 @@ public class CategoryServiceImpl implements CategoryService {
 
     private final CategoryRepository categoryRepository;
     private final ModelMapper modelMapper;
+    private final MenuRepository menuRepository;
 
 
     @Override
@@ -99,23 +102,30 @@ public class CategoryServiceImpl implements CategoryService {
                 .build();
     }
 
-    @Override
-    public Response<?> deleteCategory(Long id) {
+        @Override
+        public Response<?> deleteCategory(Long id) {
 
         log.info("Inside deleteCategory()");
-        if (!categoryRepository.existsById(id)){
-            throw  new NotFoundException("Category Not Found");
+
+        // 1. Kiểm tra Category tồn tại
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Category Not Found"));
+
+        // 2. Kiểm tra Category có Menu sử dụng không
+        boolean linked = menuRepository.existsByCategoryId(id);
+        if (linked) {
+                throw new BadRequestException("Category is linked to Menu and cannot be deleted");
         }
 
+        // 3. Xoá
         categoryRepository.deleteById(id);
-
 
         return Response.builder()
                 .statusCode(HttpStatus.OK.value())
                 .message("Category deleted successfully")
                 .build();
+        }
 
-    }
 }
 
 
