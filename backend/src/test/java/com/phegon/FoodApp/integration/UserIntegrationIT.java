@@ -31,6 +31,7 @@ import java.util.*;
 )
 @ActiveProfiles("test")
 @Import(FakeS3Config.class)
+
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class UserIntegrationIT {
 
