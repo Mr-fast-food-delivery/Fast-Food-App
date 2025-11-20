@@ -164,6 +164,10 @@
 					<includes>
 						<include>**/*Test.java</include>
 					</includes>
+					<excludes>
+						<exclude>**/*IT.java</exclude>
+						<exclude>**/*IntegrationIT.java</exclude>
+					</excludes>
 				</configuration>
 			</plugin>
 
@@ -179,11 +183,13 @@
 						<configuration>
 							<includes>
 								<include>**/*IT.java</include>
+								<include>**/*IntegrationIT.java</include>
 							</includes>
 						</configuration>
 					</execution>
 				</executions>
 			</plugin>
+
 
 		</plugins>
 	</build>
