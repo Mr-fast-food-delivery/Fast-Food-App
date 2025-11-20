@@ -10,7 +10,6 @@ import com.phegon.FoodApp.category.entity.Category;
 import com.phegon.FoodApp.category.repository.CategoryRepository;
 import com.phegon.FoodApp.menu.entity.Menu;
 import com.phegon.FoodApp.menu.repository.MenuRepository;
-import com.phegon.FoodApp.menu.services.MenuService;
 import com.phegon.FoodApp.response.Response;
 import com.phegon.FoodApp.role.entity.Role;
 import com.phegon.FoodApp.role.repository.RoleRepository;
@@ -42,12 +41,15 @@ public class CategoryIntegrationIT {
     @Autowired private JwtUtils jwtUtils;
     @Autowired private CategoryRepository categoryRepository;
     @Autowired private MenuRepository menuRepository;
+
     private String url(String path) {
         return "http://localhost:" + port + "/api/categories" + path;
     }
 
     @BeforeEach
     void setup() {
+        // Đảm bảo sạch dữ liệu giữa các test
+        menuRepository.deleteAll();
         categoryRepository.deleteAll();
         userRepository.deleteAll();
         roleRepository.deleteAll();
@@ -61,7 +63,7 @@ public class CategoryIntegrationIT {
         User u = User.builder()
                 .email(email)
                 .name("Admin")
-                .password("$2a$10$fake")
+                .password("$2a$10$fake") // không dùng để login nên không sao
                 .address("HCM")
                 .phoneNumber("0123456789")
                 .roles(List.of(admin))
@@ -103,7 +105,8 @@ public class CategoryIntegrationIT {
     // INT008 – CREATE CATEGORY
     // =========================================================================
 
-    @Test @Order(1)
+    @Test
+    @Order(1)
     void INT008_01_createCategory_success() {
         User admin = createAdmin("admin@gmail.com");
         String token = jwtUtils.generateToken(admin.getEmail());
@@ -120,9 +123,14 @@ public class CategoryIntegrationIT {
         );
 
         Assertions.assertEquals(200, res.getStatusCodeValue());
+
+        Response<?> body = parse(res.getBody());
+        Assertions.assertEquals(200, body.getStatusCode());
+        Assertions.assertEquals("Category added successfully", body.getMessage());
     }
 
-    @Test @Order(2)
+    @Test
+    @Order(2)
     void INT008_02_noToken() {
         CategoryDTO dto = new CategoryDTO();
         dto.setName("Pizza");
@@ -137,7 +145,8 @@ public class CategoryIntegrationIT {
         Assertions.assertEquals(401, res.getStatusCodeValue());
     }
 
-    @Test @Order(3)
+    @Test
+    @Order(3)
     void INT008_03_forbidden_customer() {
         User user = createCustomer("c@gmail.com");
         String token = jwtUtils.generateToken(user.getEmail());
@@ -155,7 +164,8 @@ public class CategoryIntegrationIT {
         Assertions.assertEquals(403, res.getStatusCodeValue());
     }
 
-    @Test @Order(4)
+    @Test
+    @Order(4)
     void INT008_04_nameNull() {
         User admin = createAdmin("a2@gmail.com");
         String token = jwtUtils.generateToken(admin.getEmail());
@@ -173,7 +183,8 @@ public class CategoryIntegrationIT {
         Assertions.assertEquals(400, res.getStatusCodeValue());
     }
 
-    @Test @Order(5)
+    @Test
+    @Order(5)
     void INT008_05_nameEmpty() {
         User admin = createAdmin("a3@gmail.com");
         String token = jwtUtils.generateToken(admin.getEmail());
@@ -191,7 +202,8 @@ public class CategoryIntegrationIT {
         Assertions.assertEquals(400, res.getStatusCodeValue());
     }
 
-    @Test @Order(6)
+    @Test
+    @Order(6)
     void INT008_06_nameSpacesOnly() {
         User admin = createAdmin("a4@gmail.com");
         String token = jwtUtils.generateToken(admin.getEmail());
@@ -209,7 +221,8 @@ public class CategoryIntegrationIT {
         Assertions.assertEquals(400, res.getStatusCodeValue());
     }
 
-    @Test @Order(7)
+    @Test
+    @Order(7)
     void INT008_07_duplicateName() {
         categoryRepository.save(
                 Category.builder()
@@ -231,15 +244,17 @@ public class CategoryIntegrationIT {
                 String.class
         );
 
+        // Tùy logic: nếu bạn đã thêm check existsByName → 400.
+        // Nếu để DB constraint ném lỗi → ExceptionHandler cũng nên map về 400.
         Assertions.assertEquals(400, res.getStatusCodeValue());
     }
-
 
     // =========================================================================
     // INT009 – UPDATE CATEGORY
     // =========================================================================
 
-    @Test @Order(8)
+    @Test
+    @Order(8)
     void INT009_01_update_success() {
         Category c = categoryRepository.save(
                 Category.builder()
@@ -264,9 +279,14 @@ public class CategoryIntegrationIT {
         );
 
         Assertions.assertEquals(200, res.getStatusCodeValue());
+
+        Response<?> body = parse(res.getBody());
+        Assertions.assertEquals(200, body.getStatusCode());
+        Assertions.assertEquals("Category updated successfully", body.getMessage());
     }
 
-    @Test @Order(9)
+    @Test
+    @Order(9)
     void INT009_02_notFound() {
         User admin = createAdmin("adminX@gmail.com");
         String token = jwtUtils.generateToken(admin.getEmail());
@@ -285,7 +305,8 @@ public class CategoryIntegrationIT {
         Assertions.assertEquals(404, res.getStatusCodeValue());
     }
 
-    @Test @Order(10)
+    @Test
+    @Order(10)
     void INT009_03_missingToken() {
         CategoryDTO dto = new CategoryDTO();
         dto.setId(1L);
@@ -301,7 +322,8 @@ public class CategoryIntegrationIT {
         Assertions.assertEquals(401, res.getStatusCodeValue());
     }
 
-    @Test @Order(11)
+    @Test
+    @Order(11)
     void INT009_04_customerForbidden() {
         Category c = categoryRepository.save(
                 Category.builder()
@@ -327,7 +349,8 @@ public class CategoryIntegrationIT {
         Assertions.assertEquals(403, res.getStatusCodeValue());
     }
 
-    @Test @Order(12)
+    @Test
+    @Order(12)
     void INT009_05_nameEmpty() {
         Category c = categoryRepository.save(
                 Category.builder()
@@ -353,7 +376,8 @@ public class CategoryIntegrationIT {
         Assertions.assertEquals(400, res.getStatusCodeValue());
     }
 
-    @Test @Order(13)
+    @Test
+    @Order(13)
     void INT009_06_duplicateName() {
         categoryRepository.save(
                 Category.builder()
@@ -386,12 +410,12 @@ public class CategoryIntegrationIT {
         Assertions.assertEquals(400, res.getStatusCodeValue());
     }
 
-
     // =========================================================================
     // INT010 – GET ALL CATEGORIES
     // =========================================================================
 
-    @Test @Order(14)
+    @Test
+    @Order(14)
     void INT010_01_getAll_success() {
         categoryRepository.save(
                 Category.builder().name("Pizza").description("d1").build()
@@ -405,12 +429,12 @@ public class CategoryIntegrationIT {
         Assertions.assertEquals(200, res.getStatusCodeValue());
     }
 
-
     // =========================================================================
     // INT011 – GET CATEGORY BY ID
     // =========================================================================
 
-    @Test @Order(15)
+    @Test
+    @Order(15)
     void INT011_01_success() {
         Category c = categoryRepository.save(
                 Category.builder()
@@ -424,19 +448,20 @@ public class CategoryIntegrationIT {
         Assertions.assertEquals(200, res.getStatusCodeValue());
     }
 
-    @Test @Order(16)
+    @Test
+    @Order(16)
     void INT011_02_notFound() {
         ResponseEntity<String> res = rest.getForEntity(url("/999"), String.class);
 
         Assertions.assertEquals(404, res.getStatusCodeValue());
     }
 
-
     // =========================================================================
     // INT012 – DELETE CATEGORY
     // =========================================================================
 
-    @Test @Order(17)
+    @Test
+    @Order(17)
     void INT012_01_delete_success() {
         Category c = categoryRepository.save(
                 Category.builder()
@@ -456,9 +481,11 @@ public class CategoryIntegrationIT {
         );
 
         Assertions.assertEquals(200, res.getStatusCodeValue());
+        Assertions.assertFalse(categoryRepository.existsById(c.getId()));
     }
 
-    @Test @Order(18)
+    @Test
+    @Order(18)
     void INT012_02_noToken() {
         Category c = categoryRepository.save(
                 Category.builder()
@@ -475,9 +502,11 @@ public class CategoryIntegrationIT {
         );
 
         Assertions.assertEquals(401, res.getStatusCodeValue());
+        Assertions.assertTrue(categoryRepository.existsById(c.getId()));
     }
 
-    @Test @Order(19)
+    @Test
+    @Order(19)
     void INT012_03_customerForbidden() {
         Category c = categoryRepository.save(
                 Category.builder()
@@ -497,9 +526,11 @@ public class CategoryIntegrationIT {
         );
 
         Assertions.assertEquals(403, res.getStatusCodeValue());
+        Assertions.assertTrue(categoryRepository.existsById(c.getId()));
     }
 
-    @Test @Order(20)
+    @Test
+    @Order(20)
     void INT012_04_notFound() {
         User admin = createAdmin("aa@gmail.com");
         String token = jwtUtils.generateToken(admin.getEmail());
@@ -514,10 +545,11 @@ public class CategoryIntegrationIT {
         Assertions.assertEquals(404, res.getStatusCodeValue());
     }
 
-    @Test @Order(21)
+    @Test
+    @Order(21)
     void INT012_05_categoryLinkedToMenu_cannotDelete() {
 
-        // 1. Tạo Category đúng chuẩn entity (dùng builder)
+        // 1. Tạo Category
         Category category = categoryRepository.save(
                 Category.builder()
                         .name("LinkedCat")
@@ -525,7 +557,7 @@ public class CategoryIntegrationIT {
                         .build()
         );
 
-        // 2. Tạo Menu liên kết với Category này
+        // 2. Tạo Menu liên kết Category này
         Menu menu = Menu.builder()
                 .name("Beef Steak")
                 .description("Premium Beef")
@@ -533,7 +565,6 @@ public class CategoryIntegrationIT {
                 .category(category)
                 .imageUrl("fake.jpg")
                 .build();
-
         menuRepository.save(menu);
 
         // 3. Tạo admin token
@@ -542,20 +573,21 @@ public class CategoryIntegrationIT {
 
         // 4. Gửi DELETE category
         ResponseEntity<String> res = rest.exchange(
-                url("/" + category.getId()),
-                HttpMethod.DELETE,
-                new HttpEntity<>(auth(token)),
-                String.class
+            url("/" + category.getId()),
+            HttpMethod.DELETE,
+            new HttpEntity<>(auth(token)),
+            String.class
         );
 
-        // 5. EXPECT: 400 hoặc 409 tùy logic backend 
         int status = res.getStatusCodeValue();
 
+        // Kỳ vọng: service dùng MenuRepository.existsByCategory... và ném 400/409
         Assertions.assertTrue(
                 status == 400 || status == 409,
-                "Expected HTTP 400 or 409 when deleting a category linked to menu, but got = " + status
+                "Expected HTTP 400 or 409 when deleting category linked to menus, but got = " + status
         );
+
+        // Đảm bảo category vẫn còn trong DB
+        Assertions.assertTrue(categoryRepository.existsById(category.getId()));
     }
-
-
 }
