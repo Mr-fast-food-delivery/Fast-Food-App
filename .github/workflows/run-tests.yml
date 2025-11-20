@@ -3,10 +3,10 @@ name: CI - Unit & Integration Tests
 on:
   push:
     branches:
-      - IT_authModule
+      - IT_categoryModule
   pull_request:
     branches:
-      - IT_authModule
+      - IT_categoryModule
   workflow_dispatch:
 
 jobs:
