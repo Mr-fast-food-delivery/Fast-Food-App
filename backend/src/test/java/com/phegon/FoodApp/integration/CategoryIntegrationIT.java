@@ -25,6 +25,9 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.util.List;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+
+@AutoConfigureMockMvc(addFilters = false)
 
 @SpringBootTest(
         classes = FoodAppApplication.class,

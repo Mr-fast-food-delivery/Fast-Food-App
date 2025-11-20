@@ -31,9 +31,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @SpringBootTest(
-        classes = FoodAppApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
+    classes = {
+        FoodAppApplication.class,
+        FakeS3Config.class   // Cho chắc chắn Spring chỉ load fake
+    },
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
 )
+
 @ActiveProfiles("test")
 @Import(FakeS3Config.class)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)

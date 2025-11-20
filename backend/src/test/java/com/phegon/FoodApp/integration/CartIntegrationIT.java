@@ -10,6 +10,7 @@ import com.phegon.FoodApp.cart.entity.Cart;
 import com.phegon.FoodApp.cart.entity.CartItem;
 import com.phegon.FoodApp.cart.repository.CartItemRepository;
 import com.phegon.FoodApp.cart.repository.CartRepository;
+import com.phegon.FoodApp.config.TestSecurityConfig;
 import com.phegon.FoodApp.menu.entity.Menu;
 import com.phegon.FoodApp.menu.repository.MenuRepository;
 import com.phegon.FoodApp.response.Response;
@@ -19,6 +20,7 @@ import com.phegon.FoodApp.security.JwtUtils;
 
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -29,13 +31,14 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.util.*;
+@Import({ FakeS3Config.class })
+@AutoConfigureMockMvc(addFilters = false)
 
 @SpringBootTest(
         classes = FoodAppApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
 )
 @ActiveProfiles("test")
-@Import(FakeS3Config.class)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CartIntegrationIT {
 
