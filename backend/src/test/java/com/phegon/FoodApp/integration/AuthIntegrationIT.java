@@ -10,13 +10,14 @@ import com.phegon.FoodApp.auth_users.repository.UserRepository;
 import com.phegon.FoodApp.role.entity.Role;
 import com.phegon.FoodApp.role.repository.RoleRepository;
 import com.phegon.FoodApp.response.Response;
+
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.http.*;
 import org.springframework.boot.test.web.server.LocalServerPort;
-
+import org.springframework.http.*;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
 
@@ -42,6 +43,9 @@ public class AuthIntegrationIT {
     @Autowired
     private ObjectMapper mapper;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     private String url(String path) {
         return "http://localhost:" + port + "/api/auth" + path;
     }
@@ -51,55 +55,48 @@ public class AuthIntegrationIT {
         userRepository.deleteAll();
         roleRepository.deleteAll();
 
-        // 🌟 Tạo role mặc định
         roleRepository.save(new Role(null, "CUSTOMER"));
         roleRepository.save(new Role(null, "ADMIN"));
     }
 
     // ============================================================
-    // INT001 – REGISTER TEST
+    // INT001 – REGISTER
     // ============================================================
 
     @Test @Order(1)
     void INT001a_register_success() {
-        RegistrationRequest req = new RegistrationRequest();
-        req.setName("TyTy");
-        req.setEmail("abc@gmail.com");
-        req.setPassword("123456");
-        req.setAddress("HCM");
-        req.setPhoneNumber("0123456789");
+        // Arrange
+        RegistrationRequest req = baseValidRegistration();
 
+        // Act
         ResponseEntity<String> res = rest.postForEntity(url("/register"), req, String.class);
 
+        // Assert
         Assertions.assertEquals(HttpStatus.OK, res.getStatusCode());
 
         Response<?> body = parse(res.getBody());
         Assertions.assertEquals(200, body.getStatusCode());
         Assertions.assertEquals("User Registered Successfully", body.getMessage());
+
+        // Verify DB
+        User u = userRepository.findByEmail(req.getEmail()).orElseThrow();
+        Assertions.assertEquals(req.getName(), u.getName());
+        Assertions.assertTrue(passwordEncoder.matches(req.getPassword(), u.getPassword()));
+        Assertions.assertTrue(u.isActive());
     }
 
     @Test @Order(2)
     void INT001b_register_email_exists() {
-        // Tạo user trước
-        User u = User.builder()
-                .name("A")
-                .email("exists@gmail.com")
-                .password("123456")
-                .phoneNumber("0123456789")
-                .address("HN")
-                .isActive(true)
-                .roles(List.of(roleRepository.findByName("CUSTOMER").get()))
-                .build();
-        userRepository.save(u);
+        // Arrange
+        createUser("exists@gmail.com", "123456");
 
-        RegistrationRequest req = new RegistrationRequest();
-        req.setName("B");
+        RegistrationRequest req = baseValidRegistration();
         req.setEmail("exists@gmail.com");
-        req.setPassword("123456");
-        req.setAddress("HCM");
-        req.setPhoneNumber("0123456789");
 
+        // Act
         ResponseEntity<String> res = rest.postForEntity(url("/register"), req, String.class);
+
+        // Assert
         Assertions.assertEquals(HttpStatus.BAD_REQUEST, res.getStatusCode());
     }
 
@@ -160,19 +157,26 @@ public class AuthIntegrationIT {
 
     @Test @Order(8)
     void INT002a_login_success() {
-        // Register trước
-        INT001a_register_success();
+        // Arrange – tạo user đúng
+        createUser("abc@gmail.com", "123456");
 
         LoginRequest req = new LoginRequest();
         req.setEmail("abc@gmail.com");
         req.setPassword("123456");
 
+        // Act
         ResponseEntity<String> res = rest.postForEntity(url("/login"), req, String.class);
 
+        // Assert
         Assertions.assertEquals(HttpStatus.OK, res.getStatusCode());
 
         Response<?> body = parse(res.getBody());
         Assertions.assertEquals("Login Successful", body.getMessage());
+        Assertions.assertNotNull(body.getData()); // body.data chứa token chẳng hạn
+
+        // Nếu login trả JWT → kiểm JWT không rỗng
+        String jwt = body.getData().toString();
+        Assertions.assertTrue(jwt.length() > 20);
     }
 
     @Test @Order(9)
@@ -188,7 +192,6 @@ public class AuthIntegrationIT {
 
     @Test @Order(10)
     void INT002c_login_wrong_password() {
-        // create user
         createUser("login@gmail.com", "123456");
 
         LoginRequest req = new LoginRequest();
@@ -226,8 +229,9 @@ public class AuthIntegrationIT {
         Assertions.assertEquals(HttpStatus.NOT_FOUND, res.getStatusCode());
     }
 
+
     // ============================================================
-    // HELPER METHODS
+    // HELPERS
     // ============================================================
 
     private RegistrationRequest baseValidRegistration() {
@@ -240,13 +244,13 @@ public class AuthIntegrationIT {
         return r;
     }
 
-    private User createUser(String email, String pass) {
+    private User createUser(String email, String rawPassword) {
         Role customer = roleRepository.findByName("CUSTOMER").orElseThrow();
 
         User u = User.builder()
-                .name("User")
+                .name("User Test")
                 .email(email)
-                .password(pass)
+                .password(passwordEncoder.encode(rawPassword))   // ✔ Encode đúng chuẩn
                 .phoneNumber("0123456789")
                 .address("HCM")
                 .isActive(true)
