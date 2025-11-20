@@ -1,7 +1,6 @@
 // ====== IMPORT & SETUP GIỮ NGUYÊN ======
 
-package unit;
-
+package com.phegon.FoodApp.unit;
 import com.phegon.FoodApp.auth_users.dtos.UserDTO;
 import com.phegon.FoodApp.auth_users.entity.User;
 import com.phegon.FoodApp.auth_users.repository.UserRepository;

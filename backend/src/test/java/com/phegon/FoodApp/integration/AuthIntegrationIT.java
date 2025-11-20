@@ -1,4 +1,4 @@
-package integration;
+package com.phegon.FoodApp.integration;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;

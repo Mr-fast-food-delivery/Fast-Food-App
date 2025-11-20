@@ -1,5 +1,4 @@
-package unit;
-
+package com.phegon.FoodApp.unit;
 import com.phegon.FoodApp.exceptions.BadRequestException;
 import com.phegon.FoodApp.exceptions.NotFoundException;
 import com.phegon.FoodApp.response.Response;

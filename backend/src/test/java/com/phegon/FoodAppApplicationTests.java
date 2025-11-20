@@ -1,3 +1,4 @@
+package com.phegon;
 
 
 import org.junit.jupiter.api.Test;

@@ -1,4 +1,4 @@
-package unit;
+package com.phegon.FoodApp.unit;
 
 import com.phegon.FoodApp.auth_users.dtos.RegistrationRequest;
 import com.phegon.FoodApp.auth_users.dtos.LoginRequest;

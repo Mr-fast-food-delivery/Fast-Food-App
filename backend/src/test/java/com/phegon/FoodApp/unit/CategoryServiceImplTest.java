@@ -1,4 +1,4 @@
-package unit;
+package com.phegon.FoodApp.unit;
 
 import com.phegon.FoodApp.category.dtos.CategoryDTO;
 import com.phegon.FoodApp.category.entity.Category;
