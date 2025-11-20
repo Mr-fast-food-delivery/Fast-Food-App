@@ -1,9 +1,10 @@
-package com.phegon.FoodApp.auth_users.services;
+package unit;
 
 import com.phegon.FoodApp.auth_users.dtos.RegistrationRequest;
 import com.phegon.FoodApp.auth_users.dtos.LoginRequest;
 import com.phegon.FoodApp.auth_users.entity.User;
 import com.phegon.FoodApp.auth_users.repository.UserRepository;
+import com.phegon.FoodApp.auth_users.services.AuthServiceImpl;
 import com.phegon.FoodApp.exceptions.BadRequestException;
 import com.phegon.FoodApp.exceptions.NotFoundException;
 import com.phegon.FoodApp.role.entity.Role;
