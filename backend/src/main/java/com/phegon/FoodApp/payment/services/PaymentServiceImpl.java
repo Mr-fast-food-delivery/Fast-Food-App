@@ -82,8 +82,8 @@ public class PaymentServiceImpl implements PaymentService {
         log.info("Amount is not null ... moving forward ...");
 
         if (order.getTotalAmount().compareTo(paymentRequest.getAmount()) != 0) {
-            log.info("Payment Amount Does Not Tally. Please Contact Out Customer Support Agent");
-            throw new BadRequestException("Payment Amount Does Not Tally. Please Contact Out Customer Support Agent");
+            log.info("Payment Amount Does Not Tally. Please Contact Out CUSTOMER Support Agent");
+            throw new BadRequestException("Payment Amount Does Not Tally. Please Contact Out CUSTOMER Support Agent");
         }
 
         log.info("Payment amount tally...moving");
@@ -140,7 +140,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         // Prepare email context. Context should be. imported from thymeleaf
         Context context = new Context(Locale.getDefault());
-        context.setVariable("customerName", order.getUser().getName());
+        context.setVariable("CUSTOMERName", order.getUser().getName());
         context.setVariable("orderId", order.getId());
         context.setVariable("currentYear", Year.now().getValue());
         context.setVariable("amount", "$" + paymentDTO.getAmount());

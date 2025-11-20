@@ -35,36 +35,62 @@ public class AuthFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        String  token = getTokenFromRequest(request);
+        String token = getTokenFromRequest(request);
 
-        if (token != null){
-            String email;
-
+        if (token != null) {
             try {
-                email = jwtUtils.getUsernameFromToken(token);
+                // 🧩 Giải mã email từ token
+                String email = jwtUtils.getUsernameFromToken(token);
 
-            }catch(Exception ex){
-                AuthenticationException authenticationException = new BadCredentialsException(ex.getMessage());
-                customAuthenticationEntryPoint.commence(request, response, authenticationException);
+                // 🧩 Load user từ DB
+                UserDetails userDetails = customUserDetailsService.loadUserByUsername(email);
+
+                // 🧩 Kiểm tra token hợp lệ và set authentication
+                if (StringUtils.hasText(email) && jwtUtils.isTokenValid(token, userDetails)) {
+                    UsernamePasswordAuthenticationToken authenticationToken =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails, null, userDetails.getAuthorities()
+                            );
+                    authenticationToken.setDetails(
+                            new WebAuthenticationDetailsSource().buildDetails(request)
+                    );
+                    SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+                }
+
+            } catch (io.jsonwebtoken.ExpiredJwtException ex) {
+                // ❌ Token hết hạn
+                log.warn("JWT expired: {}", ex.getMessage());
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"statusCode\":401,\"message\":\"JWT expired\"}");
+                return;
+
+            } catch (org.springframework.security.core.userdetails.UsernameNotFoundException ex) {
+                // ❌ User đã bị xóa khỏi DB hoặc không tồn tại
+                log.warn("User not found or deleted: {}", ex.getMessage());
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"statusCode\":401,\"message\":\"User not found or deleted\"}");
+                return;
+
+            } catch (Exception ex) {
+                // ❌ Các lỗi khác (ví dụ token sai format, signature lỗi,…)
+                log.error("JWT parse error: {}", ex.getMessage());
+                AuthenticationException authEx = new BadCredentialsException(ex.getMessage());
+                customAuthenticationEntryPoint.commence(request, response, authEx);
                 return;
             }
-
-            UserDetails userDetails = customUserDetailsService.loadUserByUsername(email);
-            if (StringUtils.hasText(email) && jwtUtils.isTokenValid(token, userDetails)){
-                UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities()
-                );
-                authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authenticationToken);
-            }
         }
 
+        // ✅ Nếu không có token hoặc không gặp lỗi thì cho qua tiếp
         try {
             filterChain.doFilter(request, response);
-        }catch (Exception e){
-            log.error(e.getMessage());
+        } catch (Exception e) {
+            log.error("Filter error: {}", e.getMessage());
         }
     }
+
+
 
 
     private String getTokenFromRequest(HttpServletRequest request) {
