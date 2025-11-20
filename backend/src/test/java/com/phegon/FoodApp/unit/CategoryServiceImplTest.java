@@ -269,26 +269,30 @@ class CategoryServiceImplTest {
 
         @Test
         void deleteCategory_Success() {
-            when(categoryRepository.existsById(1L)).thenReturn(true);
+            Category entity = mockEntity();
+
+            when(categoryRepository.findById(1L))
+                    .thenReturn(Optional.of(entity));
+
             doNothing().when(categoryRepository).deleteById(1L);
 
             Response<?> res = categoryService.deleteCategory(1L);
 
             assertEquals(200, res.getStatusCode());
-            verify(categoryRepository).existsById(1L);
+            verify(categoryRepository).findById(1L);
             verify(categoryRepository).deleteById(1L);
         }
 
         @Test
         void deleteCategory_NotFound() {
-            when(categoryRepository.existsById(1L)).thenReturn(false);
+            when(categoryRepository.findById(1L))
+                    .thenReturn(Optional.empty());
 
             assertThrows(NotFoundException.class,
                     () -> categoryService.deleteCategory(1L));
 
-            verify(categoryRepository).existsById(1L);
+            verify(categoryRepository).findById(1L);
             verify(categoryRepository, never()).deleteById(any());
         }
     }
-
 }
