@@ -77,5 +77,5 @@ jobs:
           distribution: 'temurin'
 
       - name: Run Integration Tests (Failsafe)
-        run: mvn -B verify -DskipUTs=true
+        run: mvn -Dspring.profiles.active=test test
         # Tự động chạy file *IT.java trong /integration
