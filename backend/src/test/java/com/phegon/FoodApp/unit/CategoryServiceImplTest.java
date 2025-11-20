@@ -5,6 +5,7 @@ import com.phegon.FoodApp.category.entity.Category;
 import com.phegon.FoodApp.category.repository.CategoryRepository;
 import com.phegon.FoodApp.category.services.CategoryServiceImpl;
 import com.phegon.FoodApp.exceptions.NotFoundException;
+import com.phegon.FoodApp.menu.repository.MenuRepository;
 import com.phegon.FoodApp.response.Response;
 
 import org.junit.jupiter.api.*;
@@ -25,6 +26,7 @@ class CategoryServiceImplTest {
     @Mock org.modelmapper.ModelMapper modelMapper;
 
     @InjectMocks CategoryServiceImpl categoryService;
+    @InjectMocks MenuRepository menuRepository;
 
     // Helper entity
     Category mockEntity() {
@@ -269,22 +271,30 @@ class CategoryServiceImplTest {
 
         @Test
         void deleteCategory_Success() {
+
             Category entity = mockEntity();
 
             when(categoryRepository.findById(1L))
                     .thenReturn(Optional.of(entity));
+
+            // MUST HAVE
+            when(menuRepository.existsByCategoryId(1L)).thenReturn(false);
 
             doNothing().when(categoryRepository).deleteById(1L);
 
             Response<?> res = categoryService.deleteCategory(1L);
 
             assertEquals(200, res.getStatusCode());
+
             verify(categoryRepository).findById(1L);
+            verify(menuRepository).existsByCategoryId(1L);
             verify(categoryRepository).deleteById(1L);
         }
 
+
         @Test
         void deleteCategory_NotFound() {
+
             when(categoryRepository.findById(1L))
                     .thenReturn(Optional.empty());
 
@@ -292,7 +302,9 @@ class CategoryServiceImplTest {
                     () -> categoryService.deleteCategory(1L));
 
             verify(categoryRepository).findById(1L);
+            verify(menuRepository, never()).existsByCategoryId(any());
             verify(categoryRepository, never()).deleteById(any());
         }
+
     }
 }
