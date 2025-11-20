@@ -210,7 +210,6 @@ class AuthServiceImplTest {
                 () -> authService.register(req));
     }
 
-    // ===================== LOGIN =====================
     @Test
     void testRegisterMissingName() {
         RegistrationRequest req = new RegistrationRequest();
@@ -246,6 +245,8 @@ class AuthServiceImplTest {
 
         assertThrows(BadRequestException.class, () -> authService.register(req));
     }
+
+    // ===================== LOGIN =====================
 
     @Test
     void testLoginSuccess() {
