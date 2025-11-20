@@ -19,8 +19,8 @@ import java.util.function.Function;
 public class JwtUtils {
 
 
-    // private static final long EXPIRATION_TIME = 30L * 24 * 60 * 60 * 1000; // 30 days in ms
-    private static final long EXPIRATION_TIME = 5 * 1000;
+    private static final long EXPIRATION_TIME = 30L * 24 * 60 * 60 * 1000; // 30 days in ms
+    // private static final long EXPIRATION_TIME = 5 * 1000;
     private SecretKey key;
 
     @Value("${secreteJwtString}")
@@ -57,6 +57,15 @@ public class JwtUtils {
     private boolean isTokenExpired(String token) {
         return extractClaims(token, Claims::getExpiration).before(new Date());
     }
+    public String generateExpiredToken(String email) {
+    return Jwts.builder()
+            .subject(email)
+            .issuedAt(new Date(System.currentTimeMillis() - 3600000))   // issued 1h ago
+            .expiration(new Date(System.currentTimeMillis() - 1000))   // expired 1s ago
+            .signWith(key)
+            .compact();
+}
+
 }
 
 
