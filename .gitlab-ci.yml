@@ -1,0 +1,64 @@
+stages:
+  - test
+  - build
+  - deploy
+  - monitoring
+
+#########################
+# 1. TEST BACKEND
+#########################
+backend_tests:
+  stage: test
+  image: maven:3.9.6-eclipse-temurin-21
+  script:
+    - cd backend
+    - mvn -B test
+  artifacts:
+    paths:
+      - backend/target/surefire-reports/
+    expire_in: 1 week
+
+#########################
+# 2. TEST FRONTEND
+#########################
+frontend_tests:
+  stage: test
+  image: node:20
+  script:
+    - cd frontend
+    - npm install
+    - npm test -- --watchAll=false
+
+#########################
+# 3. BUILD BACKEND IMAGE
+#########################
+build_backend:
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind
+  script:
+    - docker build -t food-backend ./backend
+
+#########################
+# 4. BUILD FRONTEND IMAGE
+#########################
+build_frontend:
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind
+  script:
+    - docker build -t food-frontend ./frontend
+
+#########################
+# 5. START MONITORING
+#########################
+start_monitoring:
+  stage: monitoring
+  image: docker:24
+  services:
+    - docker:24-dind
+  script:
+    - cd monitoring
+    - docker-compose up -d
