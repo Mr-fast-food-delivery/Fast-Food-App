@@ -143,18 +143,17 @@ cd backend
 > Nếu datasource đã được conect
 >
 > ![1764002947413](image/README/1764002947413.png)
->
-> ## Bước 7: GitLab CI/CD (tuỳ chọn)
->
-> File `.gitlab-ci.yml` có thể:
->
-> * Test backend (Maven)
-> * Test frontend (React)
-> * Build Docker images
-> * Start monitoring stack (Prometheus + Grafana + MySQL Exporter)
->
-> Ví dụ pipeline stages:
->
-> ```
-> backend_tests → frontend_tests → build → monitoring
-> ```
+
+## Bước 7: GitLab CI/CD (tuỳ chọn)
+
+File `.gitlab-ci.yml` có thể:
+
+* Test backend (Maven)
+* Test frontend (React)
+* Build Docker images
+* Start monitoring stack (Prometheus + Grafana + MySQL Exporter)
+* Ví dụ pipeline stages:
+
+```
+backend_tests → frontend_tests → build → monitoring
+```
