@@ -6,6 +6,7 @@ import com.phegon.FoodApp.FoodAppApplication;
 import com.phegon.FoodApp.auth_users.dtos.UserDTO;
 import com.phegon.FoodApp.auth_users.entity.User;
 import com.phegon.FoodApp.auth_users.repository.UserRepository;
+import com.phegon.FoodApp.config.FakeS3Config;
 import com.phegon.FoodApp.response.Response;
 import com.phegon.FoodApp.role.entity.Role;
 import com.phegon.FoodApp.role.repository.RoleRepository;

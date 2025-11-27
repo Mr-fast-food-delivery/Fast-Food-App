@@ -7,6 +7,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
@@ -22,6 +24,7 @@ import java.io.IOException;
 @Component
 @RequiredArgsConstructor
 @Slf4j
+@Profile("!test")
 public class AuthFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;

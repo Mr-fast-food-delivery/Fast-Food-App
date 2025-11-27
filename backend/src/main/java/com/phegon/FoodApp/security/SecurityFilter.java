@@ -5,6 +5,8 @@ import com.phegon.FoodApp.exceptions.CustomAuthenticationEntryPoint;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -22,6 +24,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableWebSecurity
 @EnableMethodSecurity
 @RequiredArgsConstructor
+@Profile("!test")
 public class SecurityFilter {
 
     private final AuthFilter authFilter;
@@ -29,23 +32,43 @@ public class SecurityFilter {
     private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
-        httpSecurity
-            .csrf(AbstractHttpConfigurer::disable)
-            .cors(Customizer.withDefaults())
-            .exceptionHandling(ex -> ex
-                .accessDeniedHandler(customAccessDenialHandler)
-                .authenticationEntryPoint(customAuthenticationEntryPoint))
-            .authorizeHttpRequests(req -> req
-                // 👇 Thêm dòng này để Docker healthcheck không bị 401
-                .requestMatchers("/actuator/**").permitAll()
-                .requestMatchers("/api/auth/**", "/api/categories/**", "/api/menu/**", "/api/reviews/**").permitAll()
-                .anyRequest().authenticated()
-            )
-            .sessionManagement(mag -> mag.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .addFilterBefore(authFilter, UsernamePasswordAuthenticationFilter.class);
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
-        return httpSecurity.build();
+        http.csrf(AbstractHttpConfigurer::disable)
+                .cors(Customizer.withDefaults())
+                .exceptionHandling(ex -> ex
+                        .accessDeniedHandler(customAccessDenialHandler)
+                        .authenticationEntryPoint(customAuthenticationEntryPoint)
+                )
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/actuator/**").permitAll()
+
+                        // Auth
+                        .requestMatchers("/api/auth/**").permitAll()
+
+                        // Menu GET public
+                        .requestMatchers(HttpMethod.GET, "/api/menu/**").permitAll()
+
+                        // Menu ADMIN only
+                        .requestMatchers(HttpMethod.POST, "/api/menu/**").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/menu/**").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/menu/**").hasAuthority("ADMIN")
+
+                        // Category GET public
+                        .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
+
+                        // Category ADMIN only
+                        .requestMatchers(HttpMethod.POST, "/api/categories/**").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/categories/**").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasAuthority("ADMIN")
+
+                        // Others need auth
+                        .anyRequest().authenticated()
+                )
+                .sessionManagement(cfg -> cfg.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .addFilterBefore(authFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
     }
 
     @Bean

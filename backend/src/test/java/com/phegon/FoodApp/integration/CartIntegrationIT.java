@@ -10,7 +10,7 @@ import com.phegon.FoodApp.cart.entity.Cart;
 import com.phegon.FoodApp.cart.entity.CartItem;
 import com.phegon.FoodApp.cart.repository.CartItemRepository;
 import com.phegon.FoodApp.cart.repository.CartRepository;
-import com.phegon.FoodApp.config.TestSecurityConfig;
+import com.phegon.FoodApp.config.FakeS3Config;
 import com.phegon.FoodApp.menu.entity.Menu;
 import com.phegon.FoodApp.menu.repository.MenuRepository;
 import com.phegon.FoodApp.response.Response;
@@ -18,9 +18,9 @@ import com.phegon.FoodApp.role.entity.Role;
 import com.phegon.FoodApp.role.repository.RoleRepository;
 import com.phegon.FoodApp.security.JwtUtils;
 
+import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -30,15 +30,16 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
-import java.util.*;
-@Import({ FakeS3Config.class })
-@AutoConfigureMockMvc(addFilters = false)
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
 @SpringBootTest(
         classes = FoodAppApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
 )
 @ActiveProfiles("test")
+@Import(FakeS3Config.class)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CartIntegrationIT {
 
@@ -62,11 +63,12 @@ public class CartIntegrationIT {
 
     @BeforeEach
     void setup() {
-        cartItemRepository.deleteAll();
-        cartRepository.deleteAll();
-        menuRepository.deleteAll();
-        userRepository.deleteAll();
-        roleRepository.deleteAll();
+        // Dọn DB gọn, tránh lỗi TransientObjectException / cascade
+        cartItemRepository.deleteAllInBatch();
+        cartRepository.deleteAllInBatch();
+        menuRepository.deleteAllInBatch();
+        userRepository.deleteAllInBatch();
+        roleRepository.deleteAllInBatch();
 
         roleRepository.save(new Role(null, "CUSTOMER"));
         roleRepository.save(new Role(null, "ADMIN"));
@@ -99,6 +101,25 @@ public class CartIntegrationIT {
         );
     }
 
+    private Cart createEmptyCart(User u) {
+        Cart c = Cart.builder()
+                .user(u)
+                .cartItems(new ArrayList<>())
+                .build();
+        return cartRepository.save(c);
+    }
+
+    private CartItem createCartItem(Cart cart, Menu menu, int quantity) {
+        CartItem ci = CartItem.builder()
+                .cart(cart)
+                .menu(menu)
+                .quantity(quantity)
+                .pricePerUnit(menu.getPrice())
+                .subtotal(menu.getPrice().multiply(BigDecimal.valueOf(quantity)))
+                .build();
+        return cartItemRepository.save(ci);
+    }
+
     private HttpHeaders auth(String token) {
         HttpHeaders h = new HttpHeaders();
         h.set("Authorization", "Bearer " + token);
@@ -106,6 +127,7 @@ public class CartIntegrationIT {
         return h;
     }
 
+    // Nếu sau này muốn parse body JSON thì dùng, hiện tại chưa cần
     private Response<?> parse(String json) {
         try {
             return mapper.readValue(json, new TypeReference<Response<?>>() {});
@@ -118,7 +140,8 @@ public class CartIntegrationIT {
     // INT018 – ADD ITEM
     // =========================================================================
 
-    @Test @Order(1)
+    @Test
+    @Order(1)
     void INT018_01_add_success() {
         User u = createUser("u1@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
@@ -137,7 +160,8 @@ public class CartIntegrationIT {
         Assertions.assertEquals(200, res.getStatusCodeValue());
     }
 
-    @Test @Order(2)
+    @Test
+    @Order(2)
     void INT018_02_unauthorized() {
         CartDTO req = new CartDTO();
         req.setMenuId(1L);
@@ -152,7 +176,8 @@ public class CartIntegrationIT {
         Assertions.assertEquals(401, res.getStatusCodeValue());
     }
 
-    @Test @Order(3)
+    @Test
+    @Order(3)
     void INT018_03_menuNotFound() {
         User u = createUser("u2@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
@@ -170,7 +195,8 @@ public class CartIntegrationIT {
         Assertions.assertEquals(404, res.getStatusCodeValue());
     }
 
-    @Test @Order(4)
+    @Test
+    @Order(4)
     void INT018_04_missingMenuId() {
         User u = createUser("u3@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
@@ -187,7 +213,8 @@ public class CartIntegrationIT {
         Assertions.assertEquals(400, res.getStatusCodeValue());
     }
 
-    @Test @Order(5)
+    @Test
+    @Order(5)
     void INT018_05_quantityInvalid() {
         User u = createUser("u4@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
@@ -206,7 +233,8 @@ public class CartIntegrationIT {
         Assertions.assertEquals(400, res.getStatusCodeValue());
     }
 
-    @Test @Order(6)
+    @Test
+    @Order(6)
     void INT018_06_cartAutoCreate() {
         User u = createUser("u5@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
@@ -230,26 +258,15 @@ public class CartIntegrationIT {
     // INT019 – INCREMENT ITEM
     // =========================================================================
 
-    @Test @Order(7)
+    @Test
+    @Order(7)
     void INT019_01_increment_success() {
         User u = createUser("inc@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
         Menu m = createMenu("Tea");
 
-        Cart cart = Cart.builder()
-                .user(u)
-                .cartItems(new ArrayList<>())
-                .build();
-        cart = cartRepository.save(cart);
-
-        CartItem ci = CartItem.builder()
-                .cart(cart)
-                .menu(m)
-                .quantity(1)
-                .pricePerUnit(m.getPrice())
-                .subtotal(m.getPrice())
-                .build();
-        cartItemRepository.save(ci);
+        Cart cart = createEmptyCart(u);
+        createCartItem(cart, m, 1);
 
         ResponseEntity<String> res = rest.exchange(
                 url("/items/increment/" + m.getId()),
@@ -261,7 +278,8 @@ public class CartIntegrationIT {
         Assertions.assertEquals(200, res.getStatusCodeValue());
     }
 
-    @Test @Order(8)
+    @Test
+    @Order(8)
     void INT019_02_unauthorized() {
         ResponseEntity<String> res = rest.exchange(
                 url("/items/increment/1"), HttpMethod.PUT,
@@ -271,11 +289,11 @@ public class CartIntegrationIT {
         Assertions.assertEquals(401, res.getStatusCodeValue());
     }
 
-    @Test @Order(9)
+    @Test
+    @Order(9)
     void INT019_03_cartNotFound() {
         User u = createUser("xx@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
-
         Menu m = createMenu("Pho");
 
         ResponseEntity<String> res = rest.exchange(
@@ -288,18 +306,14 @@ public class CartIntegrationIT {
         Assertions.assertEquals(404, res.getStatusCodeValue());
     }
 
-    @Test @Order(10)
+    @Test
+    @Order(10)
     void INT019_04_itemNotInCart() {
         User u = createUser("notincart@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
-
         Menu m = createMenu("Rice");
 
-        Cart cart = Cart.builder()
-                .user(u)
-                .cartItems(new ArrayList<>())
-                .build();
-        cartRepository.save(cart);
+        createEmptyCart(u);
 
         ResponseEntity<String> res = rest.exchange(
                 url("/items/increment/" + m.getId()),
@@ -311,7 +325,8 @@ public class CartIntegrationIT {
         Assertions.assertEquals(404, res.getStatusCodeValue());
     }
 
-    @Test @Order(11)
+    @Test
+    @Order(11)
     void INT019_05_menuIdNull() {
         User u = createUser("idnull@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
@@ -330,26 +345,15 @@ public class CartIntegrationIT {
     // INT020 – DECREMENT ITEM
     // =========================================================================
 
-    @Test @Order(12)
+    @Test
+    @Order(12)
     void INT020_01_decrement_success() {
         User u = createUser("dec1@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
         Menu m = createMenu("MiTom");
 
-        Cart cart = Cart.builder()
-                .user(u)
-                .cartItems(new ArrayList<>())
-                .build();
-        cartRepository.save(cart);
-
-        CartItem ci = CartItem.builder()
-                .cart(cart)
-                .menu(m)
-                .quantity(2)
-                .pricePerUnit(m.getPrice())
-                .subtotal(m.getPrice().multiply(BigDecimal.valueOf(2)))
-                .build();
-        cartItemRepository.save(ci);
+        Cart cart = createEmptyCart(u);
+        createCartItem(cart, m, 2);
 
         ResponseEntity<String> res = rest.exchange(
                 url("/items/decrement/" + m.getId()), HttpMethod.PUT,
@@ -360,26 +364,16 @@ public class CartIntegrationIT {
         Assertions.assertEquals(200, res.getStatusCodeValue());
     }
 
-    @Test @Order(13)
+    @Transactional
+    @Test
+    @Order(13)
     void INT020_02_removeItemWhenQty1() {
         User u = createUser("dec2@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
         Menu m = createMenu("Sprite");
 
-        Cart cart = Cart.builder()
-                .user(u)
-                .cartItems(new ArrayList<>())
-                .build();
-        cartRepository.save(cart);
-
-        CartItem ci = CartItem.builder()
-                .cart(cart)
-                .menu(m)
-                .quantity(1)
-                .pricePerUnit(m.getPrice())
-                .subtotal(m.getPrice())
-                .build();
-        cartItemRepository.save(ci);
+        Cart cart = createEmptyCart(u);
+        createCartItem(cart, m, 1);
 
         rest.exchange(
                 url("/items/decrement/" + m.getId()),
@@ -388,11 +382,13 @@ public class CartIntegrationIT {
                 String.class
         );
 
-        Assertions.assertEquals(0,
-                cartRepository.findByUser_Id(u.getId()).get().getCartItems().size());
+        Optional<Cart> opt = cartRepository.findByUser_Id(u.getId());
+        Assertions.assertTrue(opt.isPresent());
+        Assertions.assertEquals(0, opt.get().getCartItems().size());
     }
 
-    @Test @Order(14)
+    @Test
+    @Order(14)
     void INT020_03_unauthorized() {
         ResponseEntity<String> res = rest.exchange(
                 url("/items/decrement/1"), HttpMethod.PUT,
@@ -402,11 +398,11 @@ public class CartIntegrationIT {
         Assertions.assertEquals(401, res.getStatusCodeValue());
     }
 
-    @Test @Order(15)
+    @Test
+    @Order(15)
     void INT020_04_cartNotFound() {
         User u = createUser("noCart@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
-
         Menu m = createMenu("Pepsi");
 
         ResponseEntity<String> res = rest.exchange(
@@ -417,17 +413,14 @@ public class CartIntegrationIT {
         Assertions.assertEquals(404, res.getStatusCodeValue());
     }
 
-    @Test @Order(16)
+    @Test
+    @Order(16)
     void INT020_05_itemNotInCart() {
         User u = createUser("emptycart@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
         Menu m = createMenu("Soda");
 
-        Cart cart = Cart.builder()
-                .user(u)
-                .cartItems(new ArrayList<>())
-                .build();
-        cartRepository.save(cart);
+        createEmptyCart(u);
 
         ResponseEntity<String> res = rest.exchange(
                 url("/items/decrement/" + m.getId()), HttpMethod.PUT,
@@ -438,7 +431,8 @@ public class CartIntegrationIT {
         Assertions.assertEquals(404, res.getStatusCodeValue());
     }
 
-    @Test @Order(17)
+    @Test
+    @Order(17)
     void INT020_06_menuIdNull() {
         User u = createUser("mnull@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
@@ -456,28 +450,15 @@ public class CartIntegrationIT {
     // INT021 – REMOVE ITEM
     // =========================================================================
 
-    @Test @Order(18)
+    @Test
+    @Order(18)
     void INT021_01_remove_success() {
         User u = createUser("rm@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
-
         Menu m = createMenu("BBQ");
 
-        Cart cart = Cart.builder()
-                .user(u)
-                .cartItems(new ArrayList<>())
-                .build();
-        cartRepository.save(cart);
-
-        CartItem ci = cartItemRepository.save(
-                     CartItem.builder()
-                        .cart(cart)
-                        .menu(m)
-                        .quantity(1)
-                        .pricePerUnit(m.getPrice())
-                        .subtotal(m.getPrice())
-                        .build()
-        );
+        Cart cart = createEmptyCart(u);
+        CartItem ci = createCartItem(cart, m, 1);
 
         ResponseEntity<String> res = rest.exchange(
                 url("/items/" + ci.getId()),
@@ -489,7 +470,8 @@ public class CartIntegrationIT {
         Assertions.assertEquals(200, res.getStatusCodeValue());
     }
 
-    @Test @Order(19)
+    @Test
+    @Order(19)
     void INT021_02_unauthorized() {
         ResponseEntity<String> res = rest.exchange(
                 url("/items/1"), HttpMethod.DELETE,
@@ -499,7 +481,8 @@ public class CartIntegrationIT {
         Assertions.assertEquals(401, res.getStatusCodeValue());
     }
 
-    @Test @Order(20)
+    @Test
+    @Order(20)
     void INT021_03_cartNotFound() {
         User u = createUser("nocart2@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
@@ -513,16 +496,13 @@ public class CartIntegrationIT {
         Assertions.assertEquals(404, res.getStatusCodeValue());
     }
 
-    @Test @Order(21)
+    @Test
+    @Order(21)
     void INT021_04_cartItemNotFound() {
         User u = createUser("ci@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
 
-        Cart cart = Cart.builder()
-                .user(u)
-                .cartItems(new ArrayList<>())
-                .build();
-        cartRepository.save(cart);
+        createEmptyCart(u);
 
         ResponseEntity<String> res = rest.exchange(
                 url("/items/999"), HttpMethod.DELETE,
@@ -533,30 +513,19 @@ public class CartIntegrationIT {
         Assertions.assertEquals(404, res.getStatusCodeValue());
     }
 
-    @Test @Order(22)
+    @Test
+    @Order(22)
     void INT021_05_itemNotBelongToCart() {
         User u = createUser("owner@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
-
         User other = createUser("other@gmail.com");
 
-        Cart c1 = Cart.builder().user(u).cartItems(new ArrayList<>()).build();
-        c1 = cartRepository.save(c1);
-
-        Cart c2 = Cart.builder().user(other).cartItems(new ArrayList<>()).build();
-        c2 = cartRepository.save(c2);
+        Cart c1 = createEmptyCart(u);
+        Cart c2 = createEmptyCart(other);
 
         Menu m = createMenu("X");
 
-        CartItem ci = cartItemRepository.save(
-                CartItem.builder()
-                        .cart(c2)
-                        .menu(m)
-                        .quantity(1)
-                        .pricePerUnit(m.getPrice())
-                        .subtotal(m.getPrice())
-                        .build()
-        );
+        CartItem ci = createCartItem(c2, m, 1);
 
         ResponseEntity<String> res = rest.exchange(
                 url("/items/" + ci.getId()),
@@ -568,7 +537,8 @@ public class CartIntegrationIT {
         Assertions.assertEquals(404, res.getStatusCodeValue());
     }
 
-    @Test @Order(23)
+    @Test
+    @Order(23)
     void INT021_06_invalidCartItemId() {
         User u = createUser("inv@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
@@ -586,16 +556,13 @@ public class CartIntegrationIT {
     // INT022 – GET CART
     // =========================================================================
 
-    @Test @Order(24)
+    @Test
+    @Order(24)
     void INT022_01_getCart_success() {
         User u = createUser("get@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
 
-        Cart c = Cart.builder()
-                .user(u)
-                .cartItems(new ArrayList<>())
-                .build();
-        cartRepository.save(c);
+        createEmptyCart(u);
 
         ResponseEntity<String> res = rest.exchange(
                 url(""), HttpMethod.GET,
@@ -606,16 +573,13 @@ public class CartIntegrationIT {
         Assertions.assertEquals(200, res.getStatusCodeValue());
     }
 
-    @Test @Order(25)
+    @Test
+    @Order(25)
     void INT022_02_getCart_empty() {
         User u = createUser("empty@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
 
-        Cart c = Cart.builder()
-                .user(u)
-                .cartItems(new ArrayList<>())
-                .build();
-        cartRepository.save(c);
+        createEmptyCart(u);
 
         ResponseEntity<String> res = rest.exchange(
                 url(""), HttpMethod.GET,
@@ -626,7 +590,8 @@ public class CartIntegrationIT {
         Assertions.assertEquals(200, res.getStatusCodeValue());
     }
 
-    @Test @Order(26)
+    @Test
+    @Order(26)
     void INT022_03_unauthorized() {
         ResponseEntity<String> res = rest.exchange(
                 url(""), HttpMethod.GET,
@@ -637,7 +602,8 @@ public class CartIntegrationIT {
         Assertions.assertEquals(401, res.getStatusCodeValue());
     }
 
-    @Test @Order(27)
+    @Test
+    @Order(27)
     void INT022_04_cartNotFound() {
         User u = createUser("nocart@email.com");
         String token = jwtUtils.generateToken(u.getEmail());
@@ -655,26 +621,15 @@ public class CartIntegrationIT {
     // INT023 – CLEAR CART
     // =========================================================================
 
-    @Test @Order(28)
+    @Test
+    @Order(28)
     void INT023_01_clear_success() {
         User u = createUser("clr@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());
         Menu m = createMenu("Kebab");
 
-        Cart cart = Cart.builder()
-                .user(u)
-                .cartItems(new ArrayList<>())
-                .build();
-        cartRepository.save(cart);
-
-        CartItem ci = CartItem.builder()
-                .cart(cart)
-                .menu(m)
-                .quantity(1)
-                .pricePerUnit(m.getPrice())
-                .subtotal(m.getPrice())
-                .build();
-        cartItemRepository.save(ci);
+        Cart cart = createEmptyCart(u);
+        createCartItem(cart, m, 1);
 
         ResponseEntity<String> res = rest.exchange(
                 url(""), HttpMethod.DELETE,
@@ -685,7 +640,8 @@ public class CartIntegrationIT {
         Assertions.assertEquals(200, res.getStatusCodeValue());
     }
 
-    @Test @Order(29)
+    @Test
+    @Order(29)
     void INT023_02_unauthorized() {
         ResponseEntity<String> res = rest.exchange(
                 url(""), HttpMethod.DELETE,
@@ -696,7 +652,8 @@ public class CartIntegrationIT {
         Assertions.assertEquals(401, res.getStatusCodeValue());
     }
 
-    @Test @Order(30)
+    @Test
+    @Order(30)
     void INT023_03_cartNotFound() {
         User u = createUser("noclf@gmail.com");
         String token = jwtUtils.generateToken(u.getEmail());

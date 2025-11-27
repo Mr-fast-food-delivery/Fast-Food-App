@@ -1,6 +1,5 @@
 package com.phegon.FoodApp.category.services;
 
-
 import com.phegon.FoodApp.category.dtos.CategoryDTO;
 import com.phegon.FoodApp.category.entity.Category;
 import com.phegon.FoodApp.category.repository.CategoryRepository;
@@ -21,21 +20,32 @@ import java.util.List;
 @Slf4j
 public class CategoryServiceImpl implements CategoryService {
 
-
     private final CategoryRepository categoryRepository;
     private final ModelMapper modelMapper;
     private final MenuRepository menuRepository;
 
-
+    // =========================================================================
+    // ADD CATEGORY
+    // =========================================================================
     @Override
     public Response<CategoryDTO> addCategory(CategoryDTO categoryDTO) {
 
         log.info("Inside addCategory()");
 
+        // 1. Validate name
+        if (categoryDTO.getName() == null || categoryDTO.getName().trim().isEmpty()) {
+            throw new BadRequestException("Category name is required");
+        }
+
+        // 2. Check duplicate
+        boolean exists = categoryRepository.existsByNameIgnoreCase(categoryDTO.getName());
+        if (exists) {
+            throw new BadRequestException("Category name already exists");
+        }
+
+        // 3. Save
         Category category = modelMapper.map(categoryDTO, Category.class);
-
         categoryRepository.save(category);
-
 
         return Response.<CategoryDTO>builder()
                 .statusCode(HttpStatus.OK.value())
@@ -43,20 +53,39 @@ public class CategoryServiceImpl implements CategoryService {
                 .build();
     }
 
-
+    // =========================================================================
+    // UPDATE CATEGORY
+    // =========================================================================
     @Override
     public Response<CategoryDTO> updateCategory(CategoryDTO categoryDTO) {
 
         log.info("Inside updateCategory()");
 
         Category category = categoryRepository.findById(categoryDTO.getId())
-                .orElseThrow(()-> new NotFoundException("Category Not Found"));
+                .orElseThrow(() -> new NotFoundException("Category Not Found"));
 
-        if (categoryDTO.getName() != null && !categoryDTO.getName().isEmpty()) category.setName(categoryDTO.getName());
-        if (categoryDTO.getDescription() != null) category.setDescription(categoryDTO.getDescription());
+        // Nếu client truyền name → validate
+        if (categoryDTO.getName() != null) {
+
+            String newName = categoryDTO.getName().trim();
+
+            if (newName.isEmpty()) {
+                throw new BadRequestException("Category name cannot be empty");
+            }
+
+            // check duplicate and must not match itself
+            boolean exists = categoryRepository.existsByNameIgnoreCaseAndIdNot(newName, categoryDTO.getId());
+            if (exists) {
+                throw new BadRequestException("Category name already exists");
+            }
+
+            category.setName(newName);
+        }
+
+        if (categoryDTO.getDescription() != null)
+            category.setDescription(categoryDTO.getDescription());
 
         categoryRepository.save(category);
-
 
         return Response.<CategoryDTO>builder()
                 .statusCode(HttpStatus.OK.value())
@@ -64,18 +93,18 @@ public class CategoryServiceImpl implements CategoryService {
                 .build();
     }
 
-
+    // =========================================================================
+    // GET BY ID
+    // =========================================================================
     @Override
     public Response<CategoryDTO> getCategoryById(Long id) {
 
         log.info("Inside getCategoryById()");
 
-
         Category category = categoryRepository.findById(id)
-                .orElseThrow(()-> new NotFoundException("Category Not Found"));
+                .orElseThrow(() -> new NotFoundException("Category Not Found"));
 
         CategoryDTO categoryDTO = modelMapper.map(category, CategoryDTO.class);
-
 
         return Response.<CategoryDTO>builder()
                 .statusCode(HttpStatus.OK.value())
@@ -84,6 +113,9 @@ public class CategoryServiceImpl implements CategoryService {
                 .build();
     }
 
+    // =========================================================================
+    // GET ALL
+    // =========================================================================
     @Override
     public Response<List<CategoryDTO>> getAllCategories() {
 
@@ -91,9 +123,8 @@ public class CategoryServiceImpl implements CategoryService {
         List<Category> categories = categoryRepository.findAll();
 
         List<CategoryDTO> categoryDTOS = categories.stream()
-                .map(category -> modelMapper.map(category, CategoryDTO.class))
+                .map(c -> modelMapper.map(c, CategoryDTO.class))
                 .toList();
-
 
         return Response.<List<CategoryDTO>>builder()
                 .statusCode(HttpStatus.OK.value())
@@ -102,35 +133,27 @@ public class CategoryServiceImpl implements CategoryService {
                 .build();
     }
 
-        @Override
-        public Response<?> deleteCategory(Long id) {
+    // =========================================================================
+    // DELETE
+    // =========================================================================
+    @Override
+    public Response<?> deleteCategory(Long id) {
 
         log.info("Inside deleteCategory()");
 
-        // 1. Kiểm tra Category tồn tại
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Category Not Found"));
 
-        // 2. Kiểm tra Category có Menu sử dụng không
         boolean linked = menuRepository.existsByCategoryId(id);
         if (linked) {
-                throw new BadRequestException("Category is linked to Menu and cannot be deleted");
+            throw new BadRequestException("Category is linked to Menu and cannot be deleted");
         }
 
-        // 3. Xoá
         categoryRepository.deleteById(id);
 
         return Response.builder()
                 .statusCode(HttpStatus.OK.value())
                 .message("Category deleted successfully")
                 .build();
-        }
-
+    }
 }
-
-
-
-
-
-
-

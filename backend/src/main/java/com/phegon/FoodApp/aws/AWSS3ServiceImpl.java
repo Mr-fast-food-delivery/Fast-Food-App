@@ -4,6 +4,7 @@ package com.phegon.FoodApp.aws;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -15,6 +16,7 @@ import java.net.URL;
 
 @Service
 @Slf4j
+@Profile("!test")
 @RequiredArgsConstructor
 public class AWSS3ServiceImpl implements AWSS3Service {
 
