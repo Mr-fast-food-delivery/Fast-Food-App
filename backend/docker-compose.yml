@@ -5,8 +5,8 @@ services:
     image: mysql:8
     container_name: mysql_test
     environment:
-      MYSQL_ROOT_PASSWORD: 123456
-      MYSQL_DATABASE: fooddb_test
+      MYSQL_ROOT_PASSWORD: 12345678
+      MYSQL_DATABASE: fooddb
     ports:
       - "3307:3306"
     networks:
