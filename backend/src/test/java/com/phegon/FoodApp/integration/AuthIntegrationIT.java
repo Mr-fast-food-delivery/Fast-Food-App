@@ -8,6 +8,7 @@ import com.phegon.FoodApp.auth_users.dtos.RegistrationRequest;
 import com.phegon.FoodApp.auth_users.entity.User;
 import com.phegon.FoodApp.auth_users.repository.UserRepository;
 import com.phegon.FoodApp.config.FakeS3Config;
+import com.phegon.FoodApp.config.TestSecurityConfig;
 import com.phegon.FoodApp.role.entity.Role;
 import com.phegon.FoodApp.role.repository.RoleRepository;
 import com.phegon.FoodApp.response.Response;
@@ -23,13 +24,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
+@Import({FakeS3Config.class, TestSecurityConfig.class})
 
 @SpringBootTest(
         classes = FoodAppApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
 )
 @ActiveProfiles("test")
-@Import(FakeS3Config.class)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class AuthIntegrationIT {
 

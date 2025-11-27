@@ -7,6 +7,7 @@ import com.phegon.FoodApp.auth_users.dtos.UserDTO;
 import com.phegon.FoodApp.auth_users.entity.User;
 import com.phegon.FoodApp.auth_users.repository.UserRepository;
 import com.phegon.FoodApp.config.FakeS3Config;
+import com.phegon.FoodApp.config.TestSecurityConfig;
 import com.phegon.FoodApp.response.Response;
 import com.phegon.FoodApp.role.entity.Role;
 import com.phegon.FoodApp.role.repository.RoleRepository;
@@ -31,7 +32,7 @@ import java.util.*;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
 )
 @ActiveProfiles("test")
-@Import(FakeS3Config.class)
+@Import({FakeS3Config.class, TestSecurityConfig.class})
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class UserIntegrationIT {
