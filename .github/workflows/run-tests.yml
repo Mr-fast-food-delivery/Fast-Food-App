@@ -2,9 +2,9 @@ name: CI - Unit & Integration Tests
 
 on:
   push:
-    branches: [ IT_cart ]
+    branches: [test_allure]
   pull_request:
-    branches: [ IT_cart ]
+    branches: [test_allure]
   workflow_dispatch:
 
 jobs:
