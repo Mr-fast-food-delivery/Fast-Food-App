@@ -208,7 +208,7 @@ jobs:
 
       - name: Show Report URL
         run: |
-          echo "============================================="
+          echo "========================================"
           echo "ALLURE REPORT READY:"
           echo "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/allure-report/"
-          echo "============================================="
+          echo "========================================"
