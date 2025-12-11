@@ -29,6 +29,10 @@ jobs:
       - name: Where am I?
         run: pwd && ls -R .
 
+      - name: Check Allure JARs
+        run: ls ~/.m2/repository/io/qameta/allure/
+
+
       - name: Cache Maven
         uses: actions/cache@v3
         with:
