@@ -9,13 +9,11 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>3.4.5</version>
-        <relativePath/>
     </parent>
 
     <groupId>com.phegon</groupId>
     <artifactId>FoodApp</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>FoodApp</name>
 
     <properties>
         <java.version>21</java.version>
@@ -114,56 +112,79 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
-		<!-- H2 Database for Integration Test -->
-		<dependency>
-			<groupId>com.h2database</groupId>
-			<artifactId>h2</artifactId>
-			<scope>test</scope>
-		</dependency>
+
+        <!-- H2 DB -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- ALLURE -->
+        <dependency>
+            <groupId>io.qameta.allure</groupId>
+            <artifactId>allure-junit5</artifactId>
+            <version>2.27.0</version>
+            <scope>test</scope>
+        </dependency>
 
     </dependencies>
 
     <build>
         <plugins>
 
-            <!-- Spring Boot Plugin -->
+            <!-- Allure plugin -->
+            <plugin>
+                <groupId>io.qameta.allure</groupId>
+                <artifactId>allure-maven</artifactId>
+                <version>2.12.0</version>
+            </plugin>
+
+            <!-- Spring Boot plugin -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
 
-            <!-- UNIT TEST (Surefire) -->
+            <!-- UNIT TEST -->
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.1.2</version>
                 <configuration>
+                    <systemProperties>
+                        <property>
+                            <name>allure.results.directory</name>
+                            <value>${project.build.directory}/allure-results</value>
+                        </property>
+                    </systemProperties>
                     <includes>
                         <include>**/*Test.java</include>
                     </includes>
-                    <excludes>
-                        <exclude>**/*IT.java</exclude>
-                        <exclude>**/*IntegrationIT.java</exclude>
-                    </excludes>
                 </configuration>
             </plugin>
 
-            <!-- INTEGRATION TEST (Failsafe) -->
+            <!-- INTEGRATION TEST -->
             <plugin>
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <version>3.1.2</version>
+                <configuration>
+                    <systemProperties>
+                        <property>
+                            <name>allure.results.directory</name>
+                            <value>${project.build.directory}/allure-results</value>
+                        </property>
+                    </systemProperties>
+                    <includes>
+                        <include>**/*IT.java</include>
+                        <include>**/*IntegrationIT.java</include>
+                    </includes>
+                </configuration>
                 <executions>
                     <execution>
-                        <id>integration-tests</id>
                         <goals>
                             <goal>integration-test</goal>
                             <goal>verify</goal>
                         </goals>
-                        <configuration>
-                            <includes>
-                                <include>**/*IT.java</include>
-                                <include>**/*IntegrationIT.java</include>
-                            </includes>
-                        </configuration>
                     </execution>
                 </executions>
             </plugin>

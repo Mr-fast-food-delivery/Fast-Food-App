@@ -24,7 +24,7 @@ import java.io.IOException;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@Profile("!test")
+// @Profile("!test")
 public class AuthFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;

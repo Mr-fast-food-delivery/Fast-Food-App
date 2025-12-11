@@ -6,7 +6,6 @@ import com.phegon.FoodApp.auth_users.repository.UserRepository;
 import com.phegon.FoodApp.category.entity.Category;
 import com.phegon.FoodApp.category.repository.CategoryRepository;
 import com.phegon.FoodApp.config.FakeS3Config;
-import com.phegon.FoodApp.config.TestSecurityConfig;
 import com.phegon.FoodApp.menu.entity.Menu;
 import com.phegon.FoodApp.menu.repository.MenuRepository;
 import com.phegon.FoodApp.role.entity.Role;
@@ -34,7 +33,6 @@ import java.util.List;
     classes = {FoodAppApplication.class, FakeS3Config.class},
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
 )
-@Import(TestSecurityConfig.class)
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class MenuIntegrationIT {
