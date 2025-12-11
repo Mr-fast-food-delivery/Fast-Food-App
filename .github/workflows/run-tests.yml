@@ -41,7 +41,7 @@ jobs:
             -DskipITs=true \
             -Djunit.platform.listeners.autodetection.enabled=true \
             -Dlistener=io.qameta.allure.junitplatform.AllureJunitPlatformListener \
-            -Dallure.results.directory=target/allure-results
+            -Dallure.results.directory=target/allure-results-unit
         
       - name: Check Allure JARs
         run: ls ~/.m2/repository/io/qameta/allure/
@@ -49,14 +49,14 @@ jobs:
       - name: Debug Allure Results (Unit)
         run: |
           echo "--- UNIT Allure Results ---"
-          ls -R target/allure-results || echo "No results found"
+          ls -R target/allure-results-unit || echo "No results found"
 
 
       - name: Upload Unit Test Allure Results
         uses: actions/upload-artifact@v4
         with:
           name: allure-results-unit
-          path: target/allure-results
+          path: target/allure-results-unit
 
 
 
@@ -91,20 +91,20 @@ jobs:
             -Dspring.profiles.active=test \
             -Djunit.platform.listeners.autodetection.enabled=true \
             -Dlistener=io.qameta.allure.junitplatform.AllureJunitPlatformListener \
-            -Dallure.results.directory=target/allure-results
+            -Dallure.results.directory=target/allure-results-it
         continue-on-error: true
 
       - name: Debug Allure Results (Integration)
         run: |
           echo "--- IT Allure Results ---"
-          ls -R target/allure-results || echo "No results found"
+          ls -R target/allure-results-it || echo "No results found"
 
 
       - name: Upload Integration Test Allure Results
         uses: actions/upload-artifact@v4
         with:
           name: allure-results-it
-          path: target/allure-results
+          path: target/allure-results-it
 
 
 
@@ -152,8 +152,19 @@ jobs:
       - name: Merge Results
         run: |
           mkdir -p allure/final
-          cp -r allure/unit/* allure/final/ || true
-          cp -r allure/integration/* allure/final/ || true
+          
+          # Copy Unit results (nếu có)
+          if [ -d "allure/unit/allure-results-unit" ]; then
+            echo "Merging UNIT results..."
+            cp -r allure/unit/allure-results-unit/* allure/final/ || true
+          fi
+
+          # Copy IT results (nếu có)
+          if [ -d "allure/integration/allure-results-it" ]; then
+            echo "Merging INTEGRATION results..."
+            cp -r allure/integration/allure-results-it/* allure/final/ || true
+          fi
+
 
       # Copy history into final report
       - name: Copy History
