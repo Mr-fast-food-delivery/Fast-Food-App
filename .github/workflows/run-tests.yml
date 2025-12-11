@@ -139,9 +139,10 @@ jobs:
       # INSTALL ALLURE
       - name: Install Allure CLI
         run: |
-          sudo apt-add-repository ppa:qameta/allure -y
-          sudo apt-get update
-          sudo apt-get install allure -y
+          wget https://github.com/allure-framework/allure2/releases/download/2.32.2/allure-2.32.2.zip
+          unzip allure-2.32.2.zip -d /opt/allure
+          sudo ln -s /opt/allure/allure-2.32.2/bin/allure /usr/local/bin/allure
+          allure --version
 
       # MERGE REPORTS
       - name: Merge Allure Reports
