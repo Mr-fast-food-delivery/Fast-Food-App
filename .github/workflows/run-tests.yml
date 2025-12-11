@@ -29,10 +29,6 @@ jobs:
       - name: Where am I?
         run: pwd && ls -R .
 
-      - name: Check Allure JARs
-        run: ls ~/.m2/repository/io/qameta/allure/
-
-
       - name: Cache Maven
         uses: actions/cache@v3
         with:
@@ -40,7 +36,15 @@ jobs:
           key: m2-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
 
       - name: Run Unit Tests
-        run: mvn clean test -DskipITs=true
+        run: |
+          mvn -e clean test \
+            -DskipITs=true \
+            -Djunit.platform.listeners.autodetection.enabled=true \
+            -Dlistener=io.qameta.allure.junitplatform.AllureJunitPlatformListener \
+            -Dallure.results.directory=target/allure-results
+        
+      - name: Check Allure JARs
+        run: ls ~/.m2/repository/io/qameta/allure/
 
       - name: Debug Allure Results (Unit)
         run: |
