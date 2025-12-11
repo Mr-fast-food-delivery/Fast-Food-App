@@ -3,10 +3,10 @@ name: CI - Unit & Integration Tests
 on:
   push:
     branches:
-      - IT_cart
+      - test_allure
   pull_request:
     branches:
-      - IT_cart
+      - test_allure
   workflow_dispatch:
 
 jobs:
