@@ -202,9 +202,9 @@ jobs:
       - name: Deploy Report
         uses: peaceiris/actions-gh-pages@v3
         with:
-          github_token: "${{ secrets.GH_PAGES_TOKEN }}/allure-report/"
+          github_token: ${{ secrets.GH_PAGES_TOKEN }}
           publish_dir: allure-report
-          destination_dir: allure-report
+          # destination_dir: allure-report
 
       - name: Show Report URL
         run: |
