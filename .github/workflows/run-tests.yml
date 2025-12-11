@@ -8,9 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ============================================================
   # 1) UNIT TESTS
-  # ============================================================
   
   unit-tests:
     name: Run Unit Tests
@@ -60,9 +58,7 @@ jobs:
 
 
 
-  # ============================================================
   # 2) INTEGRATION TESTS
-  # ============================================================
   integration-tests:
     name: Run Integration Tests
     needs: unit-tests
@@ -108,9 +104,7 @@ jobs:
 
 
 
-  # ============================================================
   # 3) MERGE + HISTORY + PUBLISH REPORT
-  # ============================================================
   publish-allure:
     name: Publish Allure Report Online
     needs: [unit-tests, integration-tests]
