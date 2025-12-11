@@ -2,17 +2,18 @@ name: CI - Unit & Integration Tests
 
 on:
   push:
-    branches: [test_allure]
+    branches: [ test_allure ]
   pull_request:
-    branches: [test_allure]
+    branches: [ test_allure ]
   workflow_dispatch:
 
 jobs:
+
   # ---------------------------------------------------------
-  # 1. UNIT TEST JOB (Surefire)
+  # 1. UNIT TEST JOB
   # ---------------------------------------------------------
   unit-tests:
-    name: Run Unit Tests (Surefire)
+    name: Unit Tests
     runs-on: ubuntu-latest
 
     defaults:
@@ -20,7 +21,7 @@ jobs:
         working-directory: backend
 
     steps:
-      - name: Checkout source code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up JDK 21
@@ -29,28 +30,26 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Cache Maven Dependencies
+      - name: Cache Maven
         uses: actions/cache@v3
         with:
           path: ~/.m2
           key: m2-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            m2-${{ runner.os }}-
+          restore-keys: m2-${{ runner.os }}-
 
       - name: Run Unit Tests
-        run: mvn -B -DskipITs=true test
+        run: mvn -DskipITs=true test
 
-      # INSTALL ALLURE
       - name: Install Allure CLI
         run: |
           sudo apt-add-repository ppa:qameta/allure -y
           sudo apt-get update
           sudo apt-get install allure -y
 
-      - name: Generate Allure Report (Unit Tests)
+      - name: Generate Allure Report (Unit)
         run: allure generate target/allure-results -o target/allure-report-unit --clean
 
-      - name: Upload Allure Unit Test Report Artifact
+      - name: Upload Allure Unit Report
         uses: actions/upload-artifact@v4
         with:
           name: allure-report-unit
@@ -58,10 +57,10 @@ jobs:
 
 
   # ---------------------------------------------------------
-  # 2. INTEGRATION TEST JOB (Failsafe)
+  # 2. INTEGRATION TEST JOB
   # ---------------------------------------------------------
   integration-tests:
-    name: Run Integration Tests (Failsafe)
+    name: Integration Tests
     needs: unit-tests
     runs-on: ubuntu-latest
 
@@ -70,7 +69,7 @@ jobs:
         working-directory: backend
 
     steps:
-      - name: Checkout source code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up JDK 21
@@ -79,29 +78,26 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Cache Maven Dependencies
+      - name: Cache Maven
         uses: actions/cache@v3
         with:
           path: ~/.m2
           key: m2-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            m2-${{ runner.os }}-
+          restore-keys: m2-${{ runner.os }}-
 
       - name: Run Integration Tests
         run: mvn verify -Dspring.profiles.active=test
 
-      # INSTALL ALLURE
       - name: Install Allure CLI
         run: |
           sudo apt-add-repository ppa:qameta/allure -y
           sudo apt-get update
           sudo apt-get install allure -y
 
-      # GENERATE REPORT
-      - name: Generate Allure Report (Integration Tests)
+      - name: Generate Allure Report (IT)
         run: allure generate target/allure-results -o target/allure-report-it --clean
 
-      - name: Upload Allure Integration Test Report Artifact
+      - name: Upload Allure IT Report
         uses: actions/upload-artifact@v4
         with:
           name: allure-report-integration
@@ -109,46 +105,44 @@ jobs:
 
 
   # ---------------------------------------------------------
-  # 3. PUBLISH MERGED REPORT TO PRIVATE GITHUB PAGES
+  # 3. MERGE & PUBLISH ALLURE REPORT TO PRIVATE GITHUB PAGES
   # ---------------------------------------------------------
   publish-allure:
-    name: Publish Allure Report to Private GitHub Pages
+    name: Publish Allure Report
     needs: [unit-tests, integration-tests]
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source code
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      # DOWNLOAD ARTIFACTS
-      - name: Download Unit Test Report
+      - name: Download Unit Report
         uses: actions/download-artifact@v4
         with:
           name: allure-report-unit
           path: allure/unit
 
-      - name: Download Integration Test Report
+      - name: Download Integration Report
         uses: actions/download-artifact@v4
         with:
           name: allure-report-integration
           path: allure/integration
 
-      # MERGE REPORTS (optional)
-      - name: Merge Allure Reports into Single Report
+      - name: Install Allure CLI
         run: |
           sudo apt-add-repository ppa:qameta/allure -y
           sudo apt-get update
           sudo apt-get install allure -y
-          allure generate allure/unit allure/integration -o allure/final-report --clean
 
-      # DEPLOY PRIVATE GITHUB PAGES
-      - name: Deploy Allure Report to GitHub Pages (Private)
+      - name: Merge Reports
+        run: allure generate allure/unit allure/integration -o allure/final --clean
+
+      - name: Deploy to GitHub Pages (PRIVATE)
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./allure/final-report
+          publish_dir: allure/final
           destination_dir: allure-report
-          keep_files: true
 
-      - name: Print Report URL
-        run: echo "Allure Report: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/allure-report/"
+      - name: Print Access URL
+        run: echo "Allure Report available at: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/allure-report/"
