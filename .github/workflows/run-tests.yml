@@ -38,14 +38,14 @@ jobs:
       - name: Debug Allure Results (Unit)
         run: |
           echo "--- UNIT Allure Results ---"
-          ls -R backend/target/allure-results || echo "No results found"
+          ls -R target/allure-results || echo "No results found"
 
 
       - name: Upload Unit Test Allure Results
         uses: actions/upload-artifact@v4
         with:
           name: allure-results-unit
-          path: backend/target/allure-results
+          path: target/allure-results
 
 
 
@@ -81,14 +81,14 @@ jobs:
       - name: Debug Allure Results (Integration)
         run: |
           echo "--- IT Allure Results ---"
-          ls -R backend/target/allure-results || echo "No results found"
+          ls -R target/allure-results || echo "No results found"
 
 
       - name: Upload Integration Test Allure Results
         uses: actions/upload-artifact@v4
         with:
           name: allure-results-it
-          path: backend/target/allure-results
+          path: target/allure-results
 
 
 
