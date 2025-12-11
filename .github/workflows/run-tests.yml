@@ -85,77 +85,70 @@ jobs:
   # ============================================================
   publish-allure:
     name: Publish Allure Report Online
-    needs: [ unit-tests, integration-tests ]
+    needs: [unit-tests, integration-tests]
     runs-on: ubuntu-latest
     if: always()
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout source code
+        uses: actions/checkout@v3
 
-      # -------------------------------
-      # DOWNLOAD ALLURE RESULTS
-      # -------------------------------
+      # Restore Trend History
+      - name: Restore Previous History
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: allure-history
+          path: allure-history
+
+      # Download RAW Allure Results
       - name: Download Unit Test Results
         uses: actions/download-artifact@v4
         with:
           name: allure-results-unit
-          path: allure/allure-results
+          path: allure/unit
 
       - name: Download Integration Test Results
         uses: actions/download-artifact@v4
         with:
           name: allure-results-it
-          path: allure/allure-results
+          path: allure/integration
 
-      # -------------------------------
-      # RESTORE HISTORY
-      # -------------------------------
-      - name: Restore Previous History
-        uses: actions/download-artifact@v4
-        with:
-          name: allure-history
-          path: allure/allure-results/history
-        continue-on-error: true
-
-      # -------------------------------
-      # INSTALL ALLURE CLI
-      # -------------------------------
       - name: Install Allure CLI
         run: |
           wget https://github.com/allure-framework/allure2/releases/download/2.32.2/allure-2.32.2.zip
           unzip allure-2.32.2.zip -d /opt/allure
           sudo ln -s /opt/allure/allure-2.32.2/bin/allure /usr/local/bin/allure
-          allure --version
 
-      # -------------------------------
-      # GENERATE REPORT
-      # -------------------------------
-      - name: Generate Final Allure Report
+      # Merge results
+      - name: Merge Results
         run: |
-          allure generate allure/allure-results -o allure-report --clean
+          mkdir -p allure/final
+          cp -r allure/unit/* allure/final/ || true
+          cp -r allure/integration/* allure/final/ || true
 
-      # -------------------------------
-      # SAVE HISTORY FOR NEXT RUNS
-      # -------------------------------
+      # Copy history into final report
+      - name: Copy History
+        run: |
+          if [ -d "allure-history" ]; then
+            mkdir -p allure/final/history
+            cp -r allure-history/* allure/final/history/
+          fi
+
+      # Generate report
+      - name: Generate Final Allure Report
+        run: allure generate allure/final -o allure-report --clean
+
+      # Save history for next build
       - name: Save History
         uses: actions/upload-artifact@v4
         with:
           name: allure-history
           path: allure-report/history
 
-      # -------------------------------
-      # DEPLOY REPORT TO GH-PAGES
-      # -------------------------------
-      - name: Deploy Report
+      # Deploy
+      - name: Deploy Allure Report
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GH_PAGES_TOKEN }}
           publish_dir: allure-report
-          destination_dir: allure-report
-
-      - name: Show Report URL
-        run: |
-          echo "============================================="
-          echo "ALLURE REPORT READY:"
-          echo "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/allure-report/"
-          echo "============================================="
