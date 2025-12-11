@@ -2,123 +2,124 @@ name: CI - Unit & Integration Tests
 
 on:
   push:
-    branches:
-      - test_allure
+    branches: [ test_allure ]
   pull_request:
-    branches:
-      - test_allure
+    branches: [ test_allure ]
   workflow_dispatch:
 
 jobs:
-  # 1. UNIT TEST JOB (Surefire)
+  # ============================================================
+  # 1) UNIT TESTS
+  # ============================================================
   unit-tests:
     name: Run Unit Tests
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: backend
 
     steps:
-      - name: Checkout source code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v3
+      - uses: actions/setup-java@v3
         with:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Cache Maven Dependencies
+      - name: Cache Maven
         uses: actions/cache@v3
         with:
           path: ~/.m2
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-
+          key: m2-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
 
-      - name: Run Unit Tests (Surefire)
+      - name: Run Unit Tests
         run: mvn clean test -DskipITs=true
 
-      - name: Debug Allure Results (Unit)
-        run: ls -R backend/target/allure-results || echo "No results"
-
-
-      # Upload RAW allure-results
-      - name: Upload Allure Results (Unit)
+      - name: Upload Unit Test Allure Results
         uses: actions/upload-artifact@v4
         with:
           name: allure-results-unit
           path: backend/target/allure-results
 
 
-  # 2. INTEGRATION TEST JOB (Failsafe)
+
+  # ============================================================
+  # 2) INTEGRATION TESTS
+  # ============================================================
   integration-tests:
     name: Run Integration Tests
     needs: unit-tests
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: backend
 
     steps:
-      - name: Checkout source code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v3
+      - uses: actions/setup-java@v3
         with:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Cache Maven Dependencies
+      - name: Cache Maven
         uses: actions/cache@v3
         with:
           path: ~/.m2
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-
+          key: m2-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
 
-      - name: Run Integration Tests (Failsafe)
+      - name: Run Integration Tests
         run: mvn verify -Dspring.profiles.active=test
         continue-on-error: true
-      - name: Debug Allure Results (Integration)
-        run: ls -R backend/target/allure-results || echo "No results"
 
-      # Upload RAW allure-results
-      - name: Upload Allure Results (Integration)
+      - name: Upload Integration Test Allure Results
         uses: actions/upload-artifact@v4
         with:
           name: allure-results-it
           path: backend/target/allure-results
 
 
-  # 3. MERGE & PUBLISH ALLURE REPORT TO GITHUB PAGES
+
+  # ============================================================
+  # 3) MERGE + HISTORY + PUBLISH REPORT
+  # ============================================================
   publish-allure:
     name: Publish Allure Report Online
-    needs: [unit-tests, integration-tests]
+    needs: [ unit-tests, integration-tests ]
     runs-on: ubuntu-latest
     if: always()
 
     steps:
-      - name: Checkout source code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      # DOWNLOAD RAW ALLURE RESULTS
+      # -------------------------------
+      # DOWNLOAD ALLURE RESULTS
+      # -------------------------------
       - name: Download Unit Test Results
         uses: actions/download-artifact@v4
         with:
           name: allure-results-unit
-          path: allure/unit
+          path: allure/allure-results
 
       - name: Download Integration Test Results
         uses: actions/download-artifact@v4
         with:
           name: allure-results-it
-          path: allure/integration
+          path: allure/allure-results
 
+      # -------------------------------
+      # RESTORE HISTORY
+      # -------------------------------
+      - name: Restore Previous History
+        uses: actions/download-artifact@v4
+        with:
+          name: allure-history
+          path: allure/allure-results/history
+        continue-on-error: true
+
+      # -------------------------------
       # INSTALL ALLURE CLI
+      # -------------------------------
       - name: Install Allure CLI
         run: |
           wget https://github.com/allure-framework/allure2/releases/download/2.32.2/allure-2.32.2.zip
@@ -126,16 +127,26 @@ jobs:
           sudo ln -s /opt/allure/allure-2.32.2/bin/allure /usr/local/bin/allure
           allure --version
 
-      # MERGE RAW RESULTS + GENERATE REPORT
+      # -------------------------------
+      # GENERATE REPORT
+      # -------------------------------
       - name: Generate Final Allure Report
         run: |
-          mkdir -p allure/final
-          cp -r allure/unit/* allure/final/ || true
-          cp -r allure/integration/* allure/final/ || true
-          allure generate allure/final -o allure-report --clean
+          allure generate allure/allure-results -o allure-report --clean
 
-      # DEPLOY REPORT
-      - name: Deploy Allure Report to GitHub Pages
+      # -------------------------------
+      # SAVE HISTORY FOR NEXT RUNS
+      # -------------------------------
+      - name: Save History
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-history
+          path: allure-report/history
+
+      # -------------------------------
+      # DEPLOY REPORT TO GH-PAGES
+      # -------------------------------
+      - name: Deploy Report
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GH_PAGES_TOKEN }}
