@@ -23,10 +23,10 @@ jobs:
 
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -42,23 +42,19 @@ jobs:
       - name: Run Unit Tests (Surefire)
         run: mvn -B -DskipITs=true test
 
-      # =========================
       # INSTALL ALLURE
-      # =========================
       - name: Install Allure CLI
         run: |
           sudo apt-add-repository ppa:qameta/allure -y
           sudo apt-get update
           sudo apt-get install allure -y
 
-      # =========================
       # GENERATE REPORT
-      # =========================
       - name: Generate Allure Report (Unit)
         run: allure generate target/allure-results -o target/allure-report-unit --clean
 
       - name: Upload Allure Unit Report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: allure-unit-report
           path: backend/target/allure-report-unit
@@ -78,10 +74,10 @@ jobs:
 
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -97,26 +93,24 @@ jobs:
       - name: Run Integration Tests (Failsafe)
         run: mvn -Dspring.profiles.active=test verify
 
-      # =========================
       # INSTALL ALLURE
-      # =========================
       - name: Install Allure CLI
         run: |
           sudo apt-add-repository ppa:qameta/allure -y
           sudo apt-get update
           sudo apt-get install allure -y
 
-      # =========================
       # GENERATE REPORT
-      # =========================
       - name: Generate Allure Report (Integration)
         run: allure generate target/allure-results -o target/allure-report-it --clean
 
       - name: Upload Allure Integration Report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: allure-integration-report
           path: backend/target/allure-report-it
+
+
   # ---------------------------------------------------------
   # 3. MERGE & PUBLISH ALLURE REPORT TO GITHUB PAGES (PRIVATE)
   # ---------------------------------------------------------
@@ -127,22 +121,22 @@ jobs:
 
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # DOWNLOAD ARTIFACTS
+      # DOWNLOAD ARTIFACTS (v4)
       - name: Download Unit Test Report
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: allure-unit-report
           path: allure/unit
 
       - name: Download Integration Test Report
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: allure-integration-report
           path: allure/integration
 
-      # INSTALL ALLURE CLI
+      # INSTALL ALLURE
       - name: Install Allure CLI
         run: |
           sudo apt-add-repository ppa:qameta/allure -y
@@ -153,7 +147,7 @@ jobs:
       - name: Merge Allure Reports
         run: allure generate allure/unit allure/integration -o allure/final --clean
 
-      # DEPLOY REPORT TO PRIVATE GITHUB PAGES
+      # DEPLOY TO GITHUB PAGES (PRIVATE)
       - name: Deploy Allure Report to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
