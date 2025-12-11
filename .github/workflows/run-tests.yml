@@ -10,9 +10,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ---------------------------------------------------------
   # 1. UNIT TEST JOB (Surefire)
-  # ---------------------------------------------------------
   unit-tests:
     name: Run Unit Tests
     runs-on: ubuntu-latest
@@ -40,34 +38,17 @@ jobs:
             ${{ runner.os }}-maven-
 
       - name: Run Unit Tests (Surefire)
-        run: mvn -B -DskipITs=true test
+        run: mvn clean test -DskipITs=true
 
-      # =========================
-      # INSTALL ALLURE - ZIP VERSION
-      # =========================
-      - name: Install Allure CLI
-        run: |
-          wget https://github.com/allure-framework/allure2/releases/download/2.32.2/allure-2.32.2.zip
-          unzip allure-2.32.2.zip -d /opt/allure
-          sudo ln -s /opt/allure/allure-2.32.2/bin/allure /usr/local/bin/allure
-          allure --version
-
-      # =========================
-      # GENERATE REPORT
-      # =========================
-      - name: Generate Allure Report (Unit)
-        run: allure generate target/allure-results -o target/allure-report-unit --clean
-
-      - name: Upload Allure Unit Report
+      # Upload RAW allure-results
+      - name: Upload Allure Results (Unit)
         uses: actions/upload-artifact@v4
         with:
-          name: allure-unit-report
-          path: backend/target/allure-report-unit
+          name: allure-results-unit
+          path: backend/target/allure-results
 
 
-  # ---------------------------------------------------------
   # 2. INTEGRATION TEST JOB (Failsafe)
-  # ---------------------------------------------------------
   integration-tests:
     name: Run Integration Tests
     needs: unit-tests
@@ -96,38 +77,18 @@ jobs:
             ${{ runner.os }}-maven-
 
       - name: Run Integration Tests (Failsafe)
-        run: mvn -Dspring.profiles.active=test verify
+        run: mvn verify -Dspring.profiles.active=test
         continue-on-error: true
 
-      # =========================
-      # INSTALL ALLURE - ZIP VERSION
-      # =========================
-      - name: Install Allure CLI
-        if: always()
-        run: |
-          wget https://github.com/allure-framework/allure2/releases/download/2.32.2/allure-2.32.2.zip
-          unzip allure-2.32.2.zip -d /opt/allure
-          sudo ln -s /opt/allure/allure-2.32.2/bin/allure /usr/local/bin/allure
-          allure --version
-
-      # =========================
-      # GENERATE REPORT
-      # =========================
-      - name: Generate Allure Report (Integration)
-        if: always()
-        run: allure generate target/allure-results -o target/allure-report-it --clean
-
-      - name: Upload Allure Integration Report
-        if: always()
+      # Upload RAW allure-results
+      - name: Upload Allure Results (Integration)
         uses: actions/upload-artifact@v4
         with:
-          name: allure-integration-report
-          path: backend/target/allure-report-it
+          name: allure-results-it
+          path: backend/target/allure-results
 
 
-  # ---------------------------------------------------------
   # 3. MERGE & PUBLISH ALLURE REPORT TO GITHUB PAGES
-  # ---------------------------------------------------------
   publish-allure:
     name: Publish Allure Report Online
     needs: [unit-tests, integration-tests]
@@ -138,20 +99,20 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v3
 
-      # DOWNLOAD ARTIFACTS
-      - name: Download Unit Test Report
+      # DOWNLOAD RAW ALLURE RESULTS
+      - name: Download Unit Test Results
         uses: actions/download-artifact@v4
         with:
-          name: allure-unit-report
+          name: allure-results-unit
           path: allure/unit
 
-      - name: Download Integration Test Report
+      - name: Download Integration Test Results
         uses: actions/download-artifact@v4
         with:
-          name: allure-integration-report
+          name: allure-results-it
           path: allure/integration
 
-      # INSTALL ALLURE - ZIP VERSION
+      # INSTALL ALLURE CLI
       - name: Install Allure CLI
         run: |
           wget https://github.com/allure-framework/allure2/releases/download/2.32.2/allure-2.32.2.zip
@@ -159,16 +120,20 @@ jobs:
           sudo ln -s /opt/allure/allure-2.32.2/bin/allure /usr/local/bin/allure
           allure --version
 
-      # MERGE REPORTS
-      - name: Merge Allure Reports
-        run: allure generate allure/unit allure/integration -o allure/final --clean
+      # MERGE RAW RESULTS + GENERATE REPORT
+      - name: Generate Final Allure Report
+        run: |
+          mkdir -p allure/final
+          cp -r allure/unit/* allure/final/ || true
+          cp -r allure/integration/* allure/final/ || true
+          allure generate allure/final -o allure-report --clean
 
       # DEPLOY REPORT
       - name: Deploy Allure Report to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GH_PAGES_TOKEN }}
-          publish_dir: allure/final
+          publish_dir: allure-report
           destination_dir: allure-report
 
       - name: Show Report URL
