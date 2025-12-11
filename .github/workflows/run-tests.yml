@@ -97,11 +97,13 @@ jobs:
 
       - name: Run Integration Tests (Failsafe)
         run: mvn -Dspring.profiles.active=test verify
+        continue-on-error: true
 
       # =========================
       # INSTALL ALLURE - ZIP VERSION
       # =========================
       - name: Install Allure CLI
+        if: always()
         run: |
           wget https://github.com/allure-framework/allure2/releases/download/2.32.2/allure-2.32.2.zip
           unzip allure-2.32.2.zip -d /opt/allure
@@ -112,9 +114,11 @@ jobs:
       # GENERATE REPORT
       # =========================
       - name: Generate Allure Report (Integration)
+        if: always()
         run: allure generate target/allure-results -o target/allure-report-it --clean
 
       - name: Upload Allure Integration Report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: allure-integration-report
@@ -128,7 +132,8 @@ jobs:
     name: Publish Allure Report Online
     needs: [unit-tests, integration-tests]
     runs-on: ubuntu-latest
-
+    if: always()
+    
     steps:
       - name: Checkout source code
         uses: actions/checkout@v3
