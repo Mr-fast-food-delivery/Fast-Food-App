@@ -86,7 +86,12 @@ jobs:
           key: m2-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
 
       - name: Run Integration Tests
-        run: mvn verify -Dspring.profiles.active=test
+        run: |
+          mvn -e verify \
+            -Dspring.profiles.active=test \
+            -Djunit.platform.listeners.autodetection.enabled=true \
+            -Dlistener=io.qameta.allure.junitplatform.AllureJunitPlatformListener \
+            -Dallure.results.directory=target/allure-results
         continue-on-error: true
 
       - name: Debug Allure Results (Integration)
