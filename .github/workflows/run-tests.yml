@@ -118,18 +118,33 @@ jobs:
     if: always()
 
     steps:
+      # Checkout code
       - name: Checkout source code
         uses: actions/checkout@v3
 
-      # Restore Trend History
-      - name: Restore Previous History
-        uses: actions/download-artifact@v4
-        continue-on-error: true
+      # ================================
+      # 1) LẤY HISTORY TỪ NHÁNH GH-PAGES
+      # ================================
+      - name: Checkout gh-pages (history)
+        uses: actions/checkout@v3
         with:
-          name: allure-history
-          path: allure-history
+          ref: gh-pages
+          path: gh-pages
+        continue-on-error: true
 
-      # Download RAW Allure Results
+      - name: Restore History From gh-pages
+        run: |
+          if [ -d "gh-pages/allure-report/history" ]; then
+            echo "Found old history, restoring..."
+            mkdir -p allure/history
+            cp -r gh-pages/allure-report/history/* allure/history/
+          else
+            echo "No previous history found"
+          fi
+
+      # ================================
+      # 2) DOWNLOAD RAW RESULTS
+      # ================================
       - name: Download Unit Test Results
         uses: actions/download-artifact@v4
         with:
@@ -142,39 +157,48 @@ jobs:
           name: allure-results-it
           path: allure/integration
 
+      # ================================
+      # 3) INSTALL ALLURE CLI
+      # ================================
       - name: Install Allure CLI
         run: |
           wget https://github.com/allure-framework/allure2/releases/download/2.32.2/allure-2.32.2.zip
           unzip allure-2.32.2.zip -d /opt/allure
           sudo ln -s /opt/allure/allure-2.32.2/bin/allure /usr/local/bin/allure
 
-      # Merge results
-      - name: Merge Results
+      # ================================
+      # 4) MERGE RESULTS + INSERT HISTORY
+      # ================================
+      - name: Merge Allure Results
         run: |
           mkdir -p allure/final
-          cp -r allure/unit/backend/target/allure-results-unit/* allure/final/ || true
-          cp -r allure/integration/backend/target/allure-results-it/* allure/final/ || true
+          cp -r allure/unit/* allure/final/ || true
+          cp -r allure/integration/* allure/final/ || true
 
-      # Copy history into final report
-      - name: Copy History
-        run: |
-          if [ -d "allure-history" ]; then
+          # Insert previous history
+          if [ -d "allure/history" ]; then
             mkdir -p allure/final/history
-            cp -r allure-history/* allure/final/history/
+            cp -r allure/history/* allure/final/history/
           fi
 
-      # Generate report
+      # ================================
+      # 5) GENERATE REPORT
+      # ================================
       - name: Generate Final Allure Report
         run: allure generate allure/final -o allure-report --clean
 
-      # Save history for next build
-      - name: Save History
+      # ================================
+      # 6) SAVE HISTORY FOR NEXT RUN
+      # ================================
+      - name: Save Allure History
         uses: actions/upload-artifact@v4
         with:
           name: allure-history
           path: allure-report/history
 
-      # Deploy
+      # ================================
+      # 7) DEPLOY REPORT TO GH-PAGES
+      # ================================
       - name: Deploy Report
         uses: peaceiris/actions-gh-pages@v3
         with:
