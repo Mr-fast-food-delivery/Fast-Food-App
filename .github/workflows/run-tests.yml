@@ -152,19 +152,8 @@ jobs:
       - name: Merge Results
         run: |
           mkdir -p allure/final
-          
-          # Copy Unit results (nếu có)
-          if [ -d "allure/unit/allure-results-unit" ]; then
-            echo "Merging UNIT results..."
-            cp -r allure/unit/allure-results-unit/* allure/final/ || true
-          fi
-
-          # Copy IT results (nếu có)
-          if [ -d "allure/integration/allure-results-it" ]; then
-            echo "Merging INTEGRATION results..."
-            cp -r allure/integration/allure-results-it/* allure/final/ || true
-          fi
-
+          cp -r allure/unit/backend/target/allure-results-unit/* allure/final/ || true
+          cp -r allure/integration/backend/target/allure-results-it/* allure/final/ || true
 
       # Copy history into final report
       - name: Copy History
