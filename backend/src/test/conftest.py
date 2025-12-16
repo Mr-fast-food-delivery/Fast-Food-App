@@ -4,6 +4,27 @@ import uuid
 
 BASE_URL = "http://localhost:8091/api"
 
+
+# =========================
+# GENERIC HELPERS
+# =========================
+
+def assert_json_response(res):
+    assert res.headers.get("Content-Type", "").startswith("application/json"), \
+        f"Expected JSON response, got: {res.headers.get('Content-Type')}"
+    return res.json()
+
+
+def assert_success_response(body):
+    assert "statusCode" in body
+    assert body["statusCode"] == 200
+    assert "message" in body
+
+
+# =========================
+# FIXTURES
+# =========================
+
 @pytest.fixture
 def base_url():
     return BASE_URL
@@ -30,11 +51,15 @@ def register_payload(unique_email):
 def register_user(base_url, register_payload):
     res = requests.post(f"{base_url}/auth/register", json=register_payload)
     assert res.status_code == 200
+
+    body = assert_json_response(res)
+    assert_success_response(body)
+
     return register_payload
 
 
 @pytest.fixture
-def login_user(base_url, register_user):
+def login_token(base_url, register_user):
     res = requests.post(
         f"{base_url}/auth/login",
         json={
@@ -42,5 +67,11 @@ def login_user(base_url, register_user):
             "password": register_user["password"]
         }
     )
+
     assert res.status_code == 200
-    return res.json()["data"]["token"]
+    body = assert_json_response(res)
+
+    assert "data" in body, f"Login response missing data: {body}"
+    assert "token" in body["data"], f"Login response missing token: {body}"
+
+    return body["data"]["token"]

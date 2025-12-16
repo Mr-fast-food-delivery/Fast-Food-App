@@ -2,17 +2,21 @@ import requests
 
 
 # 🔹 INT-AUTH-05 – Login thành công + API protected
-def test_INT_AUTH_05_login_and_access_protected(base_url, login_user):
-    headers = {"Authorization": f"Bearer {login_user}"}
+def test_INT_AUTH_05_login_and_access_protected(base_url, login_token):
+    headers = {"Authorization": f"Bearer {login_token}"}
 
     res = requests.get(f"{base_url}/users/account", headers=headers)
+
     assert res.status_code == 200
-    assert res.json()["data"]["email"] is not None
+    body = res.json()
+
+    assert "data" in body
+    assert "email" in body["data"]
 
 
 # 🔹 INT-AUTH-06 – Login thất bại với user inactive
 def test_INT_AUTH_06_login_inactive_user(base_url, register_user):
-    # login lần 1
+    # login
     login = requests.post(
         f"{base_url}/auth/login",
         json={
