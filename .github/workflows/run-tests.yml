@@ -126,7 +126,7 @@ jobs:
 
       - name: Run Python Integration Tests
         run: |
-          pytest tests \
+          pytest src/test \
             --alluredir=target/allure-results-it
 
       # =========================
