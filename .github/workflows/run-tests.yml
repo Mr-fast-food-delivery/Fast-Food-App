@@ -2,9 +2,9 @@ name: CI - Unit & Integration Tests
 
 on:
   push:
-    branches: [ main ]
+    branches: [ integration_test ]
   pull_request:
-    branches: [ main ]
+    branches: [ integration_test ]
   workflow_dispatch:
 
 jobs:
@@ -57,19 +57,38 @@ jobs:
           path: backend/target/allure-results-unit
 
 
-
-  # 2) INTEGRATION TESTS
+  # 2) INTEGRATION TESTS (PYTHON)
   integration-tests:
-    name: Run Integration Tests
+    name: Run Integration Tests (Python)
     needs: unit-tests
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: backend
 
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: foodapp_test
+          MYSQL_USER: test
+          MYSQL_PASSWORD: test
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -ptest"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
       - uses: actions/checkout@v3
 
+      # =========================
+      # JAVA - BUILD APP
+      # =========================
       - uses: actions/setup-java@v3
         with:
           java-version: '21'
@@ -81,28 +100,44 @@ jobs:
           path: ~/.m2
           key: m2-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
 
-      - name: Run Integration Tests
+      - name: Build Spring Boot (skip tests)
+        run: mvn clean package -DskipTests
+
+      # =========================
+      # START SPRING BOOT APP
+      # =========================
+      - name: Start Spring Boot (test profile)
+        env:
+          SPRING_PROFILES_ACTIVE: test
         run: |
-          mvn -e verify \
-            -Dspring.profiles.active=test \
-            -Djunit.platform.listeners.autodetection.enabled=true \
-            -Dlistener=io.qameta.allure.junitplatform.AllureJunitPlatformListener \
-            -Dallure.results.directory=target/allure-results-it
-        continue-on-error: true
+          nohup java -jar target/*.jar &
+          sleep 30
 
-      - name: Debug Allure Results (Integration)
+      # =========================
+      # PYTHON - INTEGRATION TEST
+      # =========================
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
         run: |
-          echo "--- IT Allure Results ---"
-          ls -R target/allure-results-it || echo "No results found"
+          pip install pytest requests pytest-order allure-pytest
 
+      - name: Run Python Integration Tests
+        run: |
+          pytest tests \
+            --alluredir=target/allure-results-it
 
+      # =========================
+      # UPLOAD ALLURE
+      # =========================
       - name: Upload Integration Test Allure Results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: allure-results-it
           path: backend/target/allure-results-it
-
-
 
   # 3) MERGE + HISTORY + PUBLISH REPORT
   publish-allure:
