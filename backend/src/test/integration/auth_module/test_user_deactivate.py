@@ -1,31 +1,28 @@
 import requests
 
 
-# 🔹 INT-AUTH-08 – Deactivate làm token invalid
-def test_INT_AUTH_08_deactivate_invalidates_token(base_url, customer_token):
-    headers = {"Authorization": f"Bearer {customer_token}"}
+# 🔹 INT-AUTH-08 – Deactivate → token invalid
+def test_INT_AUTH_08_deactivate_invalidates_token(base_url, login_user):
+    headers = {"Authorization": f"Bearer {login_user}"}
 
-    res = requests.delete(f"{base_url}/users/deactivate", headers=headers)
-    assert res.status_code == 200
+    requests.delete(f"{base_url}/users/deactivate", headers=headers)
 
     res = requests.get(f"{base_url}/users/account", headers=headers)
     assert res.status_code in [401, 403, 404]
 
 
-# 🔹 INT-AUTH-09 – Deactivate gửi email / message thành công
-def test_INT_AUTH_09_deactivate_send_email(base_url, customer_token):
-    res = requests.delete(
-        f"{base_url}/users/deactivate",
-        headers={"Authorization": f"Bearer {customer_token}"}
-    )
+# 🔹 INT-AUTH-09 – Deactivate gửi email (side-effect)
+def test_INT_AUTH_09_deactivate_send_email(base_url, login_user):
+    headers = {"Authorization": f"Bearer {login_user}"}
 
+    res = requests.delete(f"{base_url}/users/deactivate", headers=headers)
     assert res.status_code == 200
-    assert "deactivated" in res.text.lower()
+    assert "Account deactivated successfully" in res.text
 
 
-# 🔹 INT-AUTH-10 – Deactivate idempotent
-def test_INT_AUTH_10_idempotent_deactivate(base_url, customer_token):
-    headers = {"Authorization": f"Bearer {customer_token}"}
+# 🔹 INT-AUTH-10 – Idempotent deactivate
+def test_INT_AUTH_10_idempotent_deactivate(base_url, login_user):
+    headers = {"Authorization": f"Bearer {login_user}"}
 
     res1 = requests.delete(f"{base_url}/users/deactivate", headers=headers)
     res2 = requests.delete(f"{base_url}/users/deactivate", headers=headers)
