@@ -1,7 +1,6 @@
 package com.phegon.FoodApp.security;
 
 import com.phegon.FoodApp.exceptions.CustomAuthenticationEntryPoint;
-import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -9,11 +8,11 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -27,93 +26,90 @@ public class AuthFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
     private final CustomUserDetailsService customUserDetailsService;
-    private final CustomAuthenticationEntryPoint authenticationEntryPoint;
+    private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
 
-    /**
-     * ✅ BỎ QUA JWT FILTER CHO AUTH API
-     * - Login / Register KHÔNG cần JWT
-     * - Tránh filter nuốt request login
-     */
-    @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getServletPath();
-        return path.startsWith("/api/auth/")
-            || path.startsWith("/actuator/");
-    }
 
     @Override
-    protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain
-    ) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain)
+            throws ServletException, IOException {
 
-        try {
-            String token = getTokenFromRequest(request);
+        String token = getTokenFromRequest(request);
 
-            if (token != null) {
-                // 1️⃣ Parse email từ JWT
+        if (token != null) {
+            try {
+                // 🧩 Giải mã email từ token
                 String email = jwtUtils.getUsernameFromToken(token);
 
-                // 2️⃣ Load user từ DB
-                UserDetails userDetails =
-                        customUserDetailsService.loadUserByUsername(email);
+                // 🧩 Load user từ DB
+                UserDetails userDetails = customUserDetailsService.loadUserByUsername(email);
 
-                // 3️⃣ Validate token
-                if (StringUtils.hasText(email)
-                        && jwtUtils.isTokenValid(token, userDetails)) {
-
-                    UsernamePasswordAuthenticationToken authentication =
+                // 🧩 Kiểm tra token hợp lệ và set authentication
+                if (StringUtils.hasText(email) && jwtUtils.isTokenValid(token, userDetails)) {
+                    UsernamePasswordAuthenticationToken authenticationToken =
                             new UsernamePasswordAuthenticationToken(
-                                    userDetails,
-                                    null,
-                                    userDetails.getAuthorities()
+                                    userDetails, null, userDetails.getAuthorities()
                             );
-
-                    authentication.setDetails(
-                            new WebAuthenticationDetailsSource()
-                                    .buildDetails(request)
+                    authenticationToken.setDetails(
+                            new WebAuthenticationDetailsSource().buildDetails(request)
                     );
-
-                    SecurityContextHolder.getContext()
-                            .setAuthentication(authentication);
+                    SecurityContextHolder.getContext().setAuthentication(authenticationToken);
                 }
+
+            } catch (io.jsonwebtoken.ExpiredJwtException ex) {
+                // ❌ Token hết hạn
+                log.warn("JWT expired: {}", ex.getMessage());
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"statusCode\":401,\"message\":\"JWT expired\"}");
+                return;
+
+            } catch (org.springframework.security.core.userdetails.UsernameNotFoundException ex) {
+                // ❌ User đã bị xóa khỏi DB hoặc không tồn tại
+                log.warn("User not found or deleted: {}", ex.getMessage());
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"statusCode\":401,\"message\":\"User not found or deleted\"}");
+                return;
+
+            } catch (Exception ex) {
+                // ❌ Các lỗi khác (ví dụ token sai format, signature lỗi,…)
+                log.error("JWT parse error: {}", ex.getMessage());
+                AuthenticationException authEx = new BadCredentialsException(ex.getMessage());
+                customAuthenticationEntryPoint.commence(request, response, authEx);
+                return;
             }
+        }
 
-            // 4️⃣ Cho request đi tiếp (BẮT BUỘC)
+        // ✅ Nếu không có token hoặc không gặp lỗi thì cho qua tiếp
+        try {
             filterChain.doFilter(request, response);
-
-        }
-        catch (ExpiredJwtException ex) {
-            log.warn("JWT expired: {}", ex.getMessage());
-            SecurityContextHolder.clearContext();
-            authenticationEntryPoint.commence(
-                    request,
-                    response,
-                    new BadCredentialsException("JWT expired", ex)
-            );
-        }
-        catch (AuthenticationException ex) {
-            log.warn("Authentication error: {}", ex.getMessage());
-            SecurityContextHolder.clearContext();
-            authenticationEntryPoint.commence(request, response, ex);
-        }
-        catch (Exception ex) {
-            log.error("Unexpected authentication error", ex);
-            SecurityContextHolder.clearContext();
-            authenticationEntryPoint.commence(
-                    request,
-                    response,
-                    new BadCredentialsException("Authentication failed", ex)
-            );
+        } catch (Exception e) {
+            log.error("Filter error: {}", e.getMessage());
         }
     }
 
+
+
+
     private String getTokenFromRequest(HttpServletRequest request) {
-        String bearer = request.getHeader("Authorization");
-        if (StringUtils.hasText(bearer) && bearer.startsWith("Bearer ")) {
-            return bearer.substring(7);
+        String tokenWithBearer = request.getHeader("Authorization");
+        if (tokenWithBearer != null && tokenWithBearer.startsWith("Bearer ")) {
+            return tokenWithBearer.substring(7);
         }
         return null;
     }
+
 }
+
+
+
+
+
+
+
+
+
+
+
