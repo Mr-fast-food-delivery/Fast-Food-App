@@ -1,39 +1,208 @@
-name: Run Unit Tests
+name: CI - Unit & Integration Tests
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  test-backend:
+  # 1) UNIT TESTS
+  
+  unit-tests:
+    name: Run Unit Tests
     runs-on: ubuntu-latest
-    
     defaults:
       run:
-        working-directory: backend   # chạy Maven trong thư mục backend
+        working-directory: backend
 
     steps:
-      - name: Checkout source code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v3
+      - uses: actions/setup-java@v3
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - name: Where am I?
+        run: pwd && ls -R .
+
+      - name: Cache Maven
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: m2-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
+
+      - name: Run Unit Tests
+        run: |
+          mvn -e clean test \
+            -DskipITs=true \
+            -Djunit.platform.listeners.autodetection.enabled=true \
+            -Dlistener=io.qameta.allure.junitplatform.AllureJunitPlatformListener \
+            -Dallure.results.directory=target/allure-results-unit
+        
+      - name: Check Allure JARs
+        run: ls ~/.m2/repository/io/qameta/allure/
+
+      - name: Debug Allure Results (Unit)
+        run: |
+          echo "--- UNIT Allure Results ---"
+          ls -R target/allure-results-unit || echo "No results found"
+
+
+      - name: Upload Unit Test Allure Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-unit
+          path: backend/target/allure-results-unit
+
+
+
+  # 2) INTEGRATION TESTS
+  integration-tests:
+    name: Run Integration Tests
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-java@v3
         with:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Cache Maven Dependencies
+      - name: Cache Maven
         uses: actions/cache@v3
         with:
           path: ~/.m2
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-
+          key: m2-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
 
-      - name: Run all unit tests
-        run: mvn -B test
+      - name: Run Integration Tests
+        run: |
+          mvn -e verify \
+            -Dspring.profiles.active=test \
+            -Djunit.platform.listeners.autodetection.enabled=true \
+            -Dlistener=io.qameta.allure.junitplatform.AllureJunitPlatformListener \
+            -Dallure.results.directory=target/allure-results-it
+        continue-on-error: true
+
+      - name: Debug Allure Results (Integration)
+        run: |
+          echo "--- IT Allure Results ---"
+          ls -R target/allure-results-it || echo "No results found"
+
+
+      - name: Upload Integration Test Allure Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-it
+          path: backend/target/allure-results-it
+
+
+
+  # 3) MERGE + HISTORY + PUBLISH REPORT
+  publish-allure:
+    name: Publish Allure Report Online
+    needs: [unit-tests, integration-tests]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      # Checkout code
+      - name: Checkout source code
+        uses: actions/checkout@v3
+
+      # ================================
+      # 1) LẤY HISTORY TỪ NHÁNH GH-PAGES
+      # ================================
+      - name: Checkout gh-pages (history)
+        uses: actions/checkout@v3
+        with:
+          ref: gh-pages
+          path: gh-pages
+        continue-on-error: true
+
+      - name: Restore History From gh-pages
+        run: |
+          if [ -d "gh-pages/allure-report/history" ]; then
+            echo "Found old history, restoring..."
+            mkdir -p allure/history
+            cp -r gh-pages/allure-report/history/* allure/history/
+          else
+            echo "No previous history found"
+          fi
+
+      # ================================
+      # 2) DOWNLOAD RAW RESULTS
+      # ================================
+      - name: Download Unit Test Results
+        uses: actions/download-artifact@v4
+        with:
+          name: allure-results-unit
+          path: allure/unit
+
+      - name: Download Integration Test Results
+        uses: actions/download-artifact@v4
+        with:
+          name: allure-results-it
+          path: allure/integration
+
+      # ================================
+      # 3) INSTALL ALLURE CLI
+      # ================================
+      - name: Install Allure CLI
+        run: |
+          wget https://github.com/allure-framework/allure2/releases/download/2.32.2/allure-2.32.2.zip
+          unzip allure-2.32.2.zip -d /opt/allure
+          sudo ln -s /opt/allure/allure-2.32.2/bin/allure /usr/local/bin/allure
+
+      # ================================
+      # 4) MERGE RESULTS + INSERT HISTORY
+      # ================================
+      - name: Merge Allure Results
+        run: |
+          mkdir -p allure/final
+          cp -r allure/unit/* allure/final/ || true
+          cp -r allure/integration/* allure/final/ || true
+
+          # Insert previous history
+          if [ -d "allure/history" ]; then
+            mkdir -p allure/final/history
+            cp -r allure/history/* allure/final/history/
+          fi
+
+      # ================================
+      # 5) GENERATE REPORT
+      # ================================
+      - name: Generate Final Allure Report
+        run: allure generate allure/final -o allure-report --clean
+
+      # ================================
+      # 6) SAVE HISTORY FOR NEXT RUN
+      # ================================
+      - name: Save Allure History
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-history
+          path: allure-report/history
+
+      # ================================
+      # 7) DEPLOY REPORT TO GH-PAGES
+      # ================================
+      - name: Deploy Report
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GH_PAGES_TOKEN }}
+          publish_dir: allure-report
+          # destination_dir: allure-report
+
+      - name: Show Report URL
+        run: |
+          echo "========================================"
+          echo "ALLURE REPORT READY:"
+          echo "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/allure-report/"
+          echo "========================================"
