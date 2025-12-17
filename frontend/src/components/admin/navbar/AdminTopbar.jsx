@@ -1,42 +1,39 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import ApiService from '../../../services/ApiService';
-import { useError } from '../../common/ErrorDisplay';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSignOutAlt, faBars } from '@fortawesome/free-solid-svg-icons';
-
+import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import ApiService from "../../../services/ApiService";
+import { useError } from "../../common/ErrorDisplay";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSignOutAlt, faBars } from "@fortawesome/free-solid-svg-icons";
 
 const AdminTopbar = () => {
-
   const navigate = useNavigate();
   const [userProfile, setUserProfile] = useState(null);
   const { ErrorDisplay, showError } = useError();
 
-
-
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const response = await ApiService.myProfile();
-        if (response.statusCode === 200) {
-          setUserProfile(response.data);
-        }
-      } catch (error) {
-        showError(error.response?.data?.message || error.message);
+  // ✅ FIX: memoized function
+  const fetchProfile = useCallback(async () => {
+    try {
+      const response = await ApiService.myProfile();
+      if (response.statusCode === 200) {
+        setUserProfile(response.data);
       }
-    };
+    } catch (error) {
+      showError(error.response?.data?.message || error.message);
+    }
+  }, [showError]);
 
+  // ✅ FIX: correct dependencies
+  useEffect(() => {
     fetchProfile();
-  }, []);
+  }, [fetchProfile]);
 
   const handleLogout = () => {
     ApiService.logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   const toggleSidebar = () => {
-    // Implement sidebar toggle logic if needed for mobile
-    document.querySelector('.admin-sidebar').classList.toggle('active');
+    document.querySelector(".admin-sidebar")?.classList.toggle("active");
   };
 
   return (
@@ -48,6 +45,7 @@ const AdminTopbar = () => {
       </div>
 
       <ErrorDisplay />
+
       <div className="topbar-right">
         <div className="user-profile">
           <img
@@ -56,7 +54,7 @@ const AdminTopbar = () => {
             className="profile-image"
           />
           <div className="profile-info">
-            <span className="profile-name">{userProfile?.name || 'Admin'}</span>
+            <span className="profile-name">{userProfile?.name || "Admin"}</span>
             <span className="profile-role">Admin</span>
           </div>
           <button className="logout-btn" onClick={handleLogout}>
