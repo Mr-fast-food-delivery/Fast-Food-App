@@ -2,7 +2,7 @@ import axios from "axios";
 
 export default class ApiService {
   // static BASE_URL = "http://localhost:8090/api"; http://18.221.120.102:8090/api
-  static BASE_URL = "http://localhost:8090/api"; //production base url
+  static BASE_URL = "https://fast-food-app-28ow.onrender.com/api"; //production base url
   // static BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
   static saveToken(token) {
