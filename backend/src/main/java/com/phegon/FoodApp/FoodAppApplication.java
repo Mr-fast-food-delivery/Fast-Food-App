@@ -1,51 +1,31 @@
 package com.phegon.FoodApp;
 
-import com.phegon.FoodApp.email_notification.dtos.NotificationDTO;
-import com.phegon.FoodApp.email_notification.services.NotificationService;
-import com.phegon.FoodApp.enums.NotificationType;
 import com.phegon.FoodApp.role.entity.Role;
 import com.phegon.FoodApp.role.repository.RoleRepository;
-
-import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 @SpringBootApplication
 @EnableAsync
-//@RequiredArgsConstructor
+@EnableTransactionManagement 
 public class FoodAppApplication {
 
-//	private final NotificationService notificationService;
+    public static void main(String[] args) {
+        SpringApplication.run(FoodAppApplication.class, args);
+    }
 
-	public static void main(String[] args) {
-		SpringApplication.run(FoodAppApplication.class, args);
-	}
-
-//	@Bean
-//	CommandLineRunner runner(){
-//		return args -> {
-//			NotificationDTO notificationDTO = NotificationDTO.builder()
-//					.recipient("phegonai@gmail.com")
-//					.subject("Hello Dennis")
-//					.body("Hey this is a test email")
-//					.type(NotificationType.EMAIL)
-//					.build();
-//
-//			notificationService.sendEmail(notificationDTO);
-//		};
-//	}
     @Bean
     CommandLineRunner initRoles(RoleRepository roleRepository) {
         return args -> {
             if (roleRepository.count() == 0) {
                 roleRepository.save(new Role(null, "CUSTOMER"));
                 roleRepository.save(new Role(null, "ADMIN"));
-                System.out.println("✅ Default roles inserted into database.");
+                System.out.println("Default roles inserted into database.");
             }
         };
     }
-
 }
