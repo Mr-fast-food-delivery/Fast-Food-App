@@ -31,8 +31,6 @@ public class NotificationServiceImpl implements NotificationService {
     @Async
     public void sendEmail(NotificationDTO notificationDTO) {
         log.info("=== Inside sendEmail() ===");
-
-        // 🔍 DEBUG ENV (CỰC KỲ QUAN TRỌNG CHO PRODUCTION)
         log.info("MAIL_HOST = {}", System.getenv("MAIL_HOST"));
         log.info("MAIL_USERNAME = {}", System.getenv("MAIL_USERNAME"));
         log.info("spring.mail.username (fromEmail) = {}", fromEmail);
@@ -45,21 +43,18 @@ public class NotificationServiceImpl implements NotificationService {
                     StandardCharsets.UTF_8.name()
             );
 
-            // ✅ FIX: fallback FROM nếu production bị rỗng
-            String sender = (fromEmail == null || fromEmail.isBlank())
-                    ? "no-reply@foodapp.com"
-                    : fromEmail;
+            if (fromEmail != null && !fromEmail.isBlank()) {
+                helper.setFrom(fromEmail);
+            }
 
-            helper.setFrom(sender);
             helper.setTo(notificationDTO.getRecipient());
             helper.setSubject(notificationDTO.getSubject());
             helper.setText(notificationDTO.getBody(), notificationDTO.isHtml());
 
             log.info("📤 Sending email to {}", notificationDTO.getRecipient());
             javaMailSender.send(mimeMessage);
-            log.info("✅ Email sent successfully");
+            log.info("✅ Email sent to {}", notificationDTO.getRecipient());
 
-            // 💾 SAVE TO DATABASE
             Notification notificationToSave = Notification.builder()
                     .recipient(notificationDTO.getRecipient())
                     .subject(notificationDTO.getSubject())
@@ -69,11 +64,11 @@ public class NotificationServiceImpl implements NotificationService {
                     .build();
 
             notificationRepository.save(notificationToSave);
-            log.info("💾 Saved email notification to DB");
+            log.info("✅ Saved to notification table");
 
         } catch (Exception e) {
             log.error("❌ Failed to send email to {}",
-                    notificationDTO.getRecipient(), e);
+                    notificationDTO.getRecipient(), e); // log full stacktrace
             throw new RuntimeException(e);
         }
     }
