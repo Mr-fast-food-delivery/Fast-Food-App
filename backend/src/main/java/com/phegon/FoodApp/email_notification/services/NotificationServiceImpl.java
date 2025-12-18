@@ -8,6 +8,7 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -22,6 +23,8 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final JavaMailSender javaMailSender;
     private final NotificationRepository notificationRepository;
+    @Value("${spring.mail.username:}")
+    private String fromEmail;
 
 
     @Override
@@ -35,6 +38,9 @@ public class NotificationServiceImpl implements NotificationService {
                     MimeMessageHelper.MULTIPART_MODE_MIXED_RELATED,
                     StandardCharsets.UTF_8.name()); // Use UTF-8
 
+            if (fromEmail != null && !fromEmail.isBlank()) {
+                helper.setFrom(fromEmail);
+            }
             helper.setTo(notificationDTO.getRecipient());
             helper.setSubject(notificationDTO.getSubject());
             helper.setText(notificationDTO.getBody(), notificationDTO.isHtml()); // Set the isHtml flag here.
@@ -55,11 +61,11 @@ public class NotificationServiceImpl implements NotificationService {
             log.info("Saved to notification table");
 
         } catch (Exception e) {
+            log.error("Failed to send email to {}: {}", notificationDTO.getRecipient(), e.getMessage());
             throw new RuntimeException(e.getMessage());
         }
     }
 }
-
 
 
 
