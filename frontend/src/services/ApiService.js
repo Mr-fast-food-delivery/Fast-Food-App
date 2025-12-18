@@ -6,8 +6,8 @@ console.log("REACT_APP_API_BASE_URL =", process.env.REACT_APP_API_BASE_URL);
 export default class ApiService {
   // static BASE_URL = "http://localhost:8090/api"; http://18.221.120.102:8090/api
   // static BASE_URL = "http://localhost:8090/api"; //production base url "https://fast-food-app-28ow.onrender.com/api"
-  // static BASE_URL = import.meta.env.VITE_API_BASE_URL;
-  static BASE_URL = "https://fast-food-app-28ow.onrender.com/api";
+  // static BASE_URL = import.meta.env.VITE_API_BASE_URL;https://fast-food-app-28ow.onrender.com/api
+  static BASE_URL = "http://localhost:8090/api";
   //save token
 
   static saveToken(token) {

@@ -33,7 +33,7 @@ const ProcessPaymenttPage = () => {
       orderId,
       amount,
     });
-  }, [searchParams, showError]); // ✅ FIX ESLint
+  }, [searchParams, showError]);
 
   const handlePaymentSuccess = (paymentIntent) => {
     console.log("Payment succeeded:", paymentIntent);
