@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 /**
  * A component that displays error messages with auto-dismiss functionality
@@ -44,14 +44,14 @@ export const useError = () => {
      * Shows an error message
      * @param {string} message - The error message to display
      */
-    const showError = (message) => {
+    const showError = useCallback((message) => {
         setErrorMessage(message);
-    };
+    }, []);
 
     /** Dismisses the current error message */
-    const dismissError = () => {
+    const dismissError = useCallback(() => {
         setErrorMessage(null);
-    };
+    }, []);
 
     return {
         // Component that renders the error display
